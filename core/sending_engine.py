@@ -397,21 +397,22 @@ class SendingEngine:
                 log(f"   ❌ No se encontró el campo 'To'")
                 return False
 
-            # Limpiar y escribir el número asegurando el foco
-            to_field.click()
-            to_field.send_keys(Keys.CONTROL, "a")
-            to_field.send_keys(Keys.BACKSPACE)
-            time.sleep(0.3)
-            to_field.send_keys(phone)
-            time.sleep(0.8)
+            # Paso 3: pegar inmediatamente el número tal como indican las instrucciones
+            try:
+                driver.switch_to.active_element.send_keys(Keys.CONTROL, "a")
+                driver.switch_to.active_element.send_keys(Keys.BACKSPACE)
+                driver.switch_to.active_element.send_keys(phone)
+            except Exception:
+                to_field.click()
+                to_field.send_keys(Keys.CONTROL, "a")
+                to_field.send_keys(Keys.BACKSPACE)
+                to_field.send_keys(phone)
 
-            log(f"   ⏳ Esperando que aparezca el contacto...")
+            # Paso 4: seleccionar el contacto con Enter
+            to_field.send_keys(Keys.ENTER)
 
-            # Presionar Enter para seleccionar el contacto y abrir el chat
-            to_field.send_keys(Keys.ENTER)
-            time.sleep(0.8)
-            to_field.send_keys(Keys.ENTER)
-            time.sleep(0.8)
+            # Paso 5: esperar 2 segundos antes de pegar el mensaje
+            time.sleep(2)
 
             # Ahora buscar el campo de texto del mensaje
             log(f"   📝 Buscando campo de mensaje...")
@@ -493,46 +494,49 @@ class SendingEngine:
                 driver.execute_script("arguments[0].focus();", text_field)
             except Exception:
                 pass
-            
+
             # Usar ActionChains para escribir el mensaje
             actions = ActionChains(driver)
             actions.move_to_element(text_field)
             actions.click()
             actions.send_keys(message)
             actions.perform()
-            
-            time.sleep(1)
-            
-            # Buscar y hacer clic en el botón de enviar
-            log(f"   📤 Buscando botón de enviar...")
-            
-            send_button_selectors = [
-                "//button[@aria-label='Send message']",
-                "//button[@aria-label='Enviar mensaje']",
-                "//button[contains(@aria-label, 'Send')]",
-                "//button[contains(@aria-label, 'Enviar')]",
-                "//button[contains(@class, 'send')]",
-                "//mw-send-button//button"
-            ]
-            
-            send_button = None
-            for selector in send_button_selectors:
-                try:
-                    send_button = driver.find_element(By.XPATH, selector)
-                    if send_button and send_button.is_enabled():
-                        log(f"   ✅ Botón de enviar encontrado")
-                        break
-                except:
-                    continue
-            
-            if send_button:
-                send_button.click()
-                log(f"   ✅ Clic en botón de enviar")
-            else:
-                # Si no encuentra el botón, intentar con Enter
-                log(f"   ⚠️ Botón no encontrado, usando Enter...")
+
+            # Paso 6: esperar 2 segundos y enviar con Enter
+            log("   ⏳ Esperando 2 segundos antes de enviar...")
+            time.sleep(2)
+            try:
                 text_field.send_keys(Keys.ENTER)
-            
+                log("   ✅ Enter enviado para mandar el mensaje")
+            except Exception:
+                # Fallback: intentar localizar botón de enviar
+                log("   ⚠️ No se pudo usar Enter, buscando botón de enviar...")
+                send_button_selectors = [
+                    "//button[@aria-label='Send message']",
+                    "//button[@aria-label='Enviar mensaje']",
+                    "//button[contains(@aria-label, 'Send')]",
+                    "//button[contains(@aria-label, 'Enviar')]",
+                    "//button[contains(@class, 'send')]",
+                    "//mw-send-button//button"
+                ]
+
+                send_button = None
+                for selector in send_button_selectors:
+                    try:
+                        send_button = driver.find_element(By.XPATH, selector)
+                        if send_button and send_button.is_enabled():
+                            log(f"   ✅ Botón de enviar encontrado")
+                            break
+                    except Exception:
+                        continue
+
+                if send_button:
+                    send_button.click()
+                    log(f"   ✅ Clic en botón de enviar")
+                else:
+                    log(f"   ❌ No se encontró método para enviar el mensaje")
+                    return False
+
             # Esperar confirmación
             time.sleep(3)
             
