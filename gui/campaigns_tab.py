@@ -48,6 +48,7 @@ class CampaignsTab(QWidget):
         self.sending_engine = SendingEngine()
         self.sending_thread = None
         self.current_contacts_file = None
+        self.sample_contact = None
         self.available_columns = []
 
         self.init_ui()
@@ -454,6 +455,7 @@ class CampaignsTab(QWidget):
                 child = self.variables_layout.takeAt(0)
                 if child.widget():
                     child.widget().deleteLater()
+            self.sample_contact = None
             self.update_preview()
             return
 
@@ -466,6 +468,7 @@ class CampaignsTab(QWidget):
 
         # Obtener columnas del primer registro
         self.available_columns = list(contacts[0].keys())
+        self.sample_contact = contacts[0]
 
         self.variables_label.setText(f"✨ {len(self.available_columns)} variables disponibles - Haz clic para insertar:")
 
@@ -515,10 +518,11 @@ class CampaignsTab(QWidget):
         preview_content = escape(content)
         for column in self.available_columns:
             placeholder = escape(f"{{{column}}}")
-            preview_content = preview_content.replace(
-                placeholder,
-                f"<span style='color:#27ae60;font-weight:700;'>{{{column}}}</span>"
-            )
+            value = ""
+            if self.sample_contact is not None:
+                value = escape(str(self.sample_contact.get(column, "")))
+            replacement = value or f"<span style='color:#27ae60;font-weight:700;'>{{{column}}}</span>"
+            preview_content = preview_content.replace(placeholder, replacement)
 
         preview_content = preview_content.replace("\n", "<br>")
         self.preview_label.setText(preview_content)
