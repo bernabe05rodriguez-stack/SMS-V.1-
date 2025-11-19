@@ -161,14 +161,14 @@ class SendingEngine:
                     driver = self._open_browser_for_profile(profile_name)
                     self.drivers[profile_name] = driver
                     log(f"✅ Navegador abierto para perfil: {profile_name}")
-                    time.sleep(2)
+                    time.sleep(1.2)
                 except Exception as e:
                     log(f"❌ Error al abrir navegador para {profile_name}: {str(e)}")
                     return False, f"Error al abrir navegador para {profile_name}"
             
             log("")
-            log("⏳ Esperando 15 segundos para que carguen los navegadores...")
-            time.sleep(15)
+            log("⏳ Esperando 10 segundos para que carguen los navegadores...")
+            time.sleep(10)
             
             # Verificar que estén en Google Messages
             log("")
@@ -180,7 +180,7 @@ class SendingEngine:
                     if "messages.google.com" not in current_url:
                         log(f"⚠️ {profile_name}: No está en Google Messages, redirigiendo...")
                         driver.get("https://messages.google.com/web")
-                        time.sleep(5)
+                        time.sleep(3)
                     else:
                         log(f"✅ {profile_name}: En Google Messages")
                 except Exception as e:
@@ -323,7 +323,7 @@ class SendingEngine:
             
             # Ir a la página principal primero
             driver.get("https://messages.google.com/web/conversations")
-            time.sleep(2)
+            time.sleep(1.5)
             
             # Buscar el botón "Start chat" o "Iniciar chat"
             wait = WebDriverWait(driver, 10)
@@ -363,12 +363,12 @@ class SendingEngine:
                     )
                     time.sleep(0.5)
                     driver.execute_script("arguments[0].click();", start_chat_btn)
-                time.sleep(2)
+                time.sleep(1.2)
             else:
                 # Si no encuentra el botón, ir directamente a la URL
                 log(f"   ⚠️ Botón no encontrado, usando URL directa...")
                 driver.get("https://messages.google.com/web/conversations/new")
-                time.sleep(2)
+                time.sleep(1.5)
             
             # Buscar el campo "To" para ingresar el número
             log(f"   📝 Ingresando número de teléfono: {phone}")
@@ -401,15 +401,17 @@ class SendingEngine:
             to_field.click()
             to_field.send_keys(Keys.CONTROL, "a")
             to_field.send_keys(Keys.BACKSPACE)
-            time.sleep(0.5)
+            time.sleep(0.3)
             to_field.send_keys(phone)
-            time.sleep(2)
+            time.sleep(0.8)
 
             log(f"   ⏳ Esperando que aparezca el contacto...")
 
             # Presionar Enter para seleccionar el contacto y abrir el chat
             to_field.send_keys(Keys.ENTER)
-            time.sleep(2)
+            time.sleep(0.8)
+            to_field.send_keys(Keys.ENTER)
+            time.sleep(0.8)
 
             # Ahora buscar el campo de texto del mensaje
             log(f"   📝 Buscando campo de mensaje...")
@@ -430,42 +432,53 @@ class SendingEngine:
                 "//div[contains(@data-placeholder, 'mensaje')]",
             ]
 
-            def find_text_field():
-                local_text_field = None
-                for selector in text_field_selectors:
-                    try:
-                        local_text_field = wait.until(
-                            EC.element_to_be_clickable((By.XPATH, selector))
-                        )
-                        if local_text_field:
-                            log(f"   ✅ Campo de mensaje encontrado")
-                            break
-                    except Exception:
-                        continue
+            def wait_for_text_field(timeout=15):
+                end_time = time.time() + timeout
 
-                if not local_text_field:
-                    # Fallback: intentar localizar cualquier campo editable visible
-                    try:
-                        editable_candidates = driver.find_elements(
-                            By.CSS_SELECTOR, "div[contenteditable='true']"
-                        )
-                        for candidate in editable_candidates:
-                            if candidate.is_displayed() and candidate.is_enabled():
-                                local_text_field = candidate
-                                log("   ✅ Campo de mensaje encontrado por búsqueda alternativa")
+                def find_text_field():
+                    local_text_field = None
+                    for selector in text_field_selectors:
+                        try:
+                            local_text_field = wait.until(
+                                EC.element_to_be_clickable((By.XPATH, selector))
+                            )
+                            if local_text_field:
+                                log(f"   ✅ Campo de mensaje encontrado")
                                 break
-                    except Exception:
-                        pass
+                        except Exception:
+                            continue
 
-                return local_text_field
+                    if not local_text_field:
+                        # Fallback: intentar localizar cualquier campo editable visible
+                        try:
+                            editable_candidates = driver.find_elements(
+                                By.CSS_SELECTOR, "div[contenteditable='true']"
+                            )
+                            for candidate in editable_candidates:
+                                if candidate.is_displayed() and candidate.is_enabled():
+                                    local_text_field = candidate
+                                    log("   ✅ Campo de mensaje encontrado por búsqueda alternativa")
+                                    break
+                        except Exception:
+                            pass
 
-            text_field = find_text_field()
+                    return local_text_field
+
+                while time.time() < end_time:
+                    local_text_field = find_text_field()
+                    if local_text_field:
+                        return local_text_field
+                    time.sleep(0.7)
+
+                return None
+
+            text_field = wait_for_text_field()
 
             if not text_field:
                 log("   ⚠️ No se abrió la conversación, reintentando...")
                 to_field.send_keys(Keys.ENTER)
-                time.sleep(2)
-                text_field = find_text_field()
+                time.sleep(1)
+                text_field = wait_for_text_field(timeout=8)
 
             if not text_field:
                 log(f"   ❌ No se encontró el campo de mensaje")
