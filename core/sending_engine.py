@@ -18,7 +18,11 @@ try:
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    from selenium.common.exceptions import TimeoutException, NoSuchElementException
+    from selenium.common.exceptions import (
+        TimeoutException,
+        NoSuchElementException,
+        ElementClickInterceptedException,
+    )
     from selenium.webdriver.common.action_chains import ActionChains
     SELENIUM_AVAILABLE = True
 except ImportError:
@@ -318,17 +322,30 @@ class SendingEngine:
             ]
             
             start_chat_btn = None
+            start_chat_locator = None
             for selector in start_chat_selectors:
                 try:
-                    start_chat_btn = driver.find_element(By.XPATH, selector)
+                    start_chat_btn = wait.until(
+                        EC.presence_of_element_located((By.XPATH, selector))
+                    )
                     if start_chat_btn:
+                        start_chat_locator = (By.XPATH, selector)
                         log(f"   ✅ Botón de nuevo chat encontrado")
                         break
-                except:
+                except Exception:
                     continue
-            
+
             if start_chat_btn:
-                start_chat_btn.click()
+                try:
+                    wait.until(EC.element_to_be_clickable(start_chat_locator)).click()
+                except ElementClickInterceptedException:
+                    log("   ⚠️ Botón bloqueado, reintentando con scroll y clic JS...")
+                    driver.execute_script(
+                        "arguments[0].scrollIntoView({block: 'center', inline: 'center'});",
+                        start_chat_btn,
+                    )
+                    time.sleep(0.5)
+                    driver.execute_script("arguments[0].click();", start_chat_btn)
                 time.sleep(2)
             else:
                 # Si no encuentra el botón, ir directamente a la URL
