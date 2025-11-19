@@ -91,7 +91,26 @@ class TemplatesManager:
             if template['nombre'] == name:
                 return template
         return None
-    
+
+    def format_value(self, var, value):
+        """Da formato especial a variables conocidas.
+
+        Actualmente formatea los montos monetarios para mostrarlos como pesos
+        con separadores de miles y dos decimales.
+        """
+        currency_fields = {'$ Hist.', '$ Asig.'}
+
+        if var in currency_fields:
+            try:
+                number = float(value)
+                formatted = f"{number:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                return f"$ {formatted}"
+            except (TypeError, ValueError):
+                # Si no se puede convertir a número, devolver tal cual
+                return str(value)
+
+        return str(value)
+
     def apply_template(self, template_content, data):
         """
         Aplica una plantilla reemplazando variables con datos.
@@ -111,7 +130,7 @@ class TemplatesManager:
         # Reemplazar cada variable
         for var in variables:
             if var in data:
-                value = str(data[var])
+                value = self.format_value(var, data[var])
                 message = message.replace(f'{{{var}}}', value)
             else:
                 # Si no existe la columna, dejar la variable

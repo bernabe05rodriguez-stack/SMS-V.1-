@@ -520,7 +520,11 @@ class CampaignsTab(QWidget):
             placeholder = escape(f"{{{column}}}")
             value = ""
             if self.sample_contact is not None:
-                value = escape(str(self.sample_contact.get(column, "")))
+                formatted = self.templates_manager.format_value(
+                    column,
+                    self.sample_contact.get(column, "")
+                )
+                value = escape(formatted)
             replacement = value or f"<span style='color:#27ae60;font-weight:700;'>{{{column}}}</span>"
             preview_content = preview_content.replace(placeholder, replacement)
 
