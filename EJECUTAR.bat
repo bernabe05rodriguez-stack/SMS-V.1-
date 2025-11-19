@@ -13,8 +13,8 @@ if exist ".venv\Scripts\python.exe" (
     echo Usando Python global del sistema.
 )
 
-echo Abriendo lanzador...
-%PYTHON_EXEC% launcher.py
+echo Abriendo aplicacion principal...
+%PYTHON_EXEC% main.py
 
 if errorlevel 1 (
     echo Hubo un error al abrir la aplicacion.

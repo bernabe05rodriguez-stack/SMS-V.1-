@@ -59,21 +59,11 @@ Puedes abrir la app de dos maneras:
   python main.py
   ```
 
-- **Modo con botón EJECUTAR:**
-
-  ```bash
-  python launcher.py
-  ```
-
-  Se abrirá una ventanita con el botón **⚡ EJECUTAR**. Al presionarlo se inicia
-  automáticamente `main.py`, ideal para usuarios que prefieren hacer clic en
-  lugar de usar la terminal.
-
 - **Windows | Doble clic:**
 
   Coloca el archivo `EJECUTAR.bat` dentro de la carpeta del programa y haz doble
   clic sobre él. El script cambia automáticamente al directorio correcto y
-  lanza `launcher.py`, por lo que no necesitas abrir la terminal.
+  lanza `main.py`, por lo que no necesitas abrir la terminal.
 
 ## 📁 Estructura del Proyecto
 
