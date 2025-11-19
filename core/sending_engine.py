@@ -406,19 +406,39 @@ class SendingEngine:
                 "//textarea[@placeholder='Mensaje de texto']",
                 "//mw-message-compose-editor//div[@contenteditable='true']",
                 "//textarea[@aria-label='Mensaje']",
-                "//textarea[@aria-label='Text message']"
+                "//textarea[@aria-label='Text message']",
+                "//div[@aria-label='Escribe un mensaje']",
+                "//div[@aria-label='Message']",
+                "//div[@role='textbox' and contains(@aria-label, 'message')]",
+                "//div[contains(@data-placeholder, 'mensaje')]",
             ]
 
             text_field = None
             for selector in text_field_selectors:
                 try:
-                    text_field = wait.until(EC.visibility_of_element_located((By.XPATH, selector)))
+                    text_field = wait.until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
                     if text_field:
                         log(f"   ✅ Campo de mensaje encontrado")
                         break
                 except Exception:
                     continue
-            
+
+            if not text_field:
+                # Fallback: intentar localizar cualquier campo editable visible
+                try:
+                    editable_candidates = driver.find_elements(
+                        By.CSS_SELECTOR, "div[contenteditable='true']"
+                    )
+                    for candidate in editable_candidates:
+                        if candidate.is_displayed() and candidate.is_enabled():
+                            text_field = candidate
+                            log("   ✅ Campo de mensaje encontrado por búsqueda alternativa")
+                            break
+                except Exception:
+                    pass
+
             if not text_field:
                 log(f"   ❌ No se encontró el campo de mensaje")
                 return False
@@ -427,6 +447,11 @@ class SendingEngine:
             log(f"   ✍️ Escribiendo mensaje...")
             text_field.click()
             time.sleep(0.5)
+
+            try:
+                driver.execute_script("arguments[0].focus();", text_field)
+            except Exception:
+                pass
             
             # Usar ActionChains para escribir el mensaje
             actions = ActionChains(driver)
