@@ -63,9 +63,51 @@ class CampaignsTab(QWidget):
         main_layout.addWidget(main_scroll)
 
         container = QWidget()
+        container.setObjectName("campaignContainer")
         layout = QVBoxLayout(container)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
+
+        container.setStyleSheet("""
+            #campaignContainer {
+                background: #f5f7fb;
+            }
+            QGroupBox {
+                background: #ffffff;
+                border: 1px solid #e3e7ef;
+                border-radius: 12px;
+                margin-top: 18px;
+                padding-top: 14px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 16px;
+                padding: 0 10px;
+                color: #34495e;
+                font-weight: 700;
+            }
+            QLabel.hint-text {
+                color: #7f8c8d;
+            }
+            QLineEdit, QComboBox, QSpinBox {
+                background: #fbfcfe;
+                border: 1px solid #dfe6f3;
+                border-radius: 8px;
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+            QSpinBox::up-button, QSpinBox::down-button {
+                width: 18px;
+            }
+            QTextEdit {
+                background: #fbfcfe;
+                border: 1px solid #dfe6f3;
+                border-radius: 10px;
+                padding: 10px;
+                font-size: 14px;
+                line-height: 1.5;
+            }
+        """)
 
         # Título con estilo
         title = QLabel("🚀 Gestión de Campañas")
@@ -83,20 +125,15 @@ class CampaignsTab(QWidget):
 
         # Sección de configuración de campaña
         config_group = QGroupBox("⚙️ Configuración Básica")
+        config_group.setObjectName("configGroup")
         config_group.setStyleSheet("""
-            QGroupBox {
-                font-size: 14px;
-                font-weight: 600;
-                border: 2px solid #3498db;
-                border-radius: 10px;
-                margin-top: 16px;
-                padding-top: 16px;
+            #configGroup {
+                border: 1px solid #b8d4f3;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #f9fbff, stop:1 #eef4ff);
             }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 8px;
-                color: #3498db;
+            #configGroup::title {
+                color: #2c81e0;
             }
         """)
         config_layout = QFormLayout()
@@ -113,7 +150,7 @@ class CampaignsTab(QWidget):
             "Se usará automáticamente el último Excel procesado desde la pestaña Perfiles."
         )
         self.contacts_info_label.setWordWrap(True)
-        self.contacts_info_label.setStyleSheet("color: #95a5a6;")
+        self.contacts_info_label.setStyleSheet("color: #6c7a89;")
         config_layout.addRow("📊 Contactos:", self.contacts_info_label)
 
         # Delay entre mensajes
@@ -146,21 +183,14 @@ class CampaignsTab(QWidget):
 
         # Sección de variables disponibles
         variables_group = QGroupBox("🏷️ Variables Disponibles")
+        variables_group.setObjectName("variablesGroup")
         variables_group.setStyleSheet("""
-            QGroupBox {
-                font-size: 13px;
-                font-weight: 600;
-                border: 1px solid #9b59b6;
-                border-radius: 10px;
-                margin-top: 12px;
-                padding-top: 12px;
-                background: #faf6ff;
+            #variablesGroup {
+                border: 1px solid #c9b7f1;
+                background: #f9f6ff;
             }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 6px;
-                color: #8e44ad;
+            #variablesGroup::title {
+                color: #7f4ccb;
             }
         """)
         variables_layout = QVBoxLayout()
@@ -170,7 +200,7 @@ class CampaignsTab(QWidget):
         self.variables_label = QLabel(
             "💡 Subí un Excel desde Perfiles para ver las variables disponibles."
         )
-        self.variables_label.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 4px 0;")
+        self.variables_label.setStyleSheet("color: #6f7a8a; font-style: italic; padding: 4px 0;")
         self.variables_label.setWordWrap(True)
         variables_layout.addWidget(self.variables_label)
 
@@ -198,20 +228,15 @@ class CampaignsTab(QWidget):
 
         # Sección de plantillas
         templates_group = QGroupBox("✍️ Mensaje de la Campaña")
+        templates_group.setObjectName("templatesGroup")
         templates_group.setStyleSheet("""
-            QGroupBox {
-                font-size: 14px;
-                font-weight: 600;
-                border: 2px solid #27ae60;
-                border-radius: 10px;
-                margin-top: 16px;
-                padding-top: 16px;
+            #templatesGroup {
+                border: 1px solid #b7e7ce;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #f7fffa, stop:1 #eefaf4);
             }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 8px;
-                color: #27ae60;
+            #templatesGroup::title {
+                color: #239b56;
             }
         """)
         templates_layout = QVBoxLayout()
@@ -224,13 +249,13 @@ class CampaignsTab(QWidget):
         self.template_combo.setMinimumHeight(32)
         self.template_combo.setStyleSheet("""
             QComboBox {
-                padding: 4px 8px;
-                font-size: 12px;
-                border: 1px solid #bdc3c7;
-                border-radius: 6px;
-                background: #f7f9f9;
+                padding: 6px 10px;
+                font-size: 13px;
+                border: 1px solid #cbd8e6;
+                border-radius: 8px;
+                background: #ffffff;
             }
-            QComboBox::drop-down { width: 20px; }
+            QComboBox::drop-down { width: 22px; }
         """)
         self.template_combo.currentTextChanged.connect(self.load_template_content)
         selector_layout.addWidget(self.template_combo)
@@ -243,15 +268,6 @@ class CampaignsTab(QWidget):
         self.template_editor = QTextEdit()
         self.template_editor.setMinimumHeight(140)
         self.template_editor.setPlaceholderText("Ejemplo: Hola {Nombre}, tu saldo es {$ Asig.}")
-        self.template_editor.setStyleSheet("""
-            QTextEdit {
-                font-size: 14px;
-                line-height: 1.5;
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                padding: 6px;
-            }
-        """)
         self.template_editor.textChanged.connect(self.update_preview)
         templates_layout.addWidget(self.template_editor)
 
@@ -262,16 +278,16 @@ class CampaignsTab(QWidget):
                 font-size: 13px;
                 font-weight: 600;
                 border: 1px dashed #27ae60;
-                border-radius: 8px;
+                border-radius: 10px;
                 margin-top: 8px;
                 padding-top: 10px;
-                background: #f8fffa;
+                background: #ffffff;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 6px;
-                color: #27ae60;
+                color: #1e8449;
             }
         """)
         preview_layout = QVBoxLayout()
@@ -279,8 +295,8 @@ class CampaignsTab(QWidget):
         self.preview_label = QLabel("Escribe el mensaje para ver la vista previa.")
         self.preview_label.setWordWrap(True)
         self.preview_label.setStyleSheet(
-            "background: white; border: 1px solid #ecf0f1; border-radius: 6px;"
-            "padding: 10px; color: #2c3e50; font-size: 13px;"
+            "background: #f6fbf7; border: 1px solid #cfe8d9; border-radius: 10px;"
+            "padding: 12px; color: #2c3e50; font-size: 13px;"
         )
         preview_layout.addWidget(self.preview_label)
         preview_group.setLayout(preview_layout)
@@ -290,36 +306,36 @@ class CampaignsTab(QWidget):
         template_buttons = QHBoxLayout()
 
         self.save_template_btn = QPushButton("💾 Guardar plantilla")
-        self.save_template_btn.setMinimumHeight(30)
+        self.save_template_btn.setMinimumHeight(32)
         self.save_template_btn.setStyleSheet("""
             QPushButton {
-                background: #f5f7f7;
-                color: #2c3e50;
-                border: 1px solid #d0d7de;
-                border-radius: 6px;
+                background: #eaf3ff;
+                color: #1c5fa3;
+                border: 1px solid #c5d9f5;
+                border-radius: 8px;
                 font-size: 12px;
-                padding: 4px 10px;
+                padding: 6px 12px;
             }
             QPushButton:hover {
-                background: #eef2f3;
+                background: #dcecff;
             }
         """)
         self.save_template_btn.clicked.connect(self.save_new_template)
         template_buttons.addWidget(self.save_template_btn)
 
         self.delete_template_btn = QPushButton("🗑️ Eliminar")
-        self.delete_template_btn.setMinimumHeight(30)
+        self.delete_template_btn.setMinimumHeight(32)
         self.delete_template_btn.setStyleSheet("""
             QPushButton {
-                background: #fdf2f2;
-                color: #7f8c8d;
-                border: 1px solid #e6dddd;
-                border-radius: 6px;
+                background: #fff3f0;
+                color: #c0392b;
+                border: 1px solid #f2c6bf;
+                border-radius: 8px;
                 font-size: 12px;
-                padding: 4px 10px;
+                padding: 6px 12px;
             }
             QPushButton:hover {
-                background: #f7eaea;
+                background: #ffe7e1;
             }
         """)
         self.delete_template_btn.clicked.connect(self.delete_template)
