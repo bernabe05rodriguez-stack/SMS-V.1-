@@ -51,9 +51,23 @@ pip install -r requirements.txt
 
 4. **Ejecutar la aplicación**
 
-```bash
-python main.py
-```
+Puedes abrir la app de dos maneras:
+
+- **Modo clásico:**
+
+  ```bash
+  python main.py
+  ```
+
+- **Modo con botón EJECUTAR:**
+
+  ```bash
+  python launcher.py
+  ```
+
+  Se abrirá una ventanita con el botón **⚡ EJECUTAR**. Al presionarlo se inicia
+  automáticamente `main.py`, ideal para usuarios que prefieren hacer clic en
+  lugar de usar la terminal.
 
 ## 📁 Estructura del Proyecto
 

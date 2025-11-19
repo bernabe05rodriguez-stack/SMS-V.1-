@@ -21,8 +21,15 @@ pip install -r requirements.txt
 ### 2. Ejecutar
 
 ```bash
+# Opción tradicional
 python main.py
+
+# Opción con botón EJECUTAR
+python launcher.py
 ```
+
+Al usar `launcher.py` verás una ventana con el botón **⚡ EJECUTAR** para abrir
+la aplicación sin comandos adicionales.
 
 ---
 
