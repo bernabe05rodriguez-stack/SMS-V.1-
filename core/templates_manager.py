@@ -102,7 +102,18 @@ class TemplatesManager:
 
         if var in currency_fields:
             try:
-                number = float(value)
+                if isinstance(value, str):
+                    # Normalizar cadenas con separadores de miles y coma decimal
+                    normalized = (
+                        value.replace('$', '')
+                        .replace(' ', '')
+                        .replace('.', '')
+                        .replace(',', '.')
+                        .strip()
+                    )
+                    number = float(normalized)
+                else:
+                    number = float(value)
                 formatted = f"{number:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                 return f"$ {formatted}"
             except (TypeError, ValueError):
