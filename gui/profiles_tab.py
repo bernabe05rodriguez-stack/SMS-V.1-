@@ -7,8 +7,9 @@ import os
 import platform
 import subprocess
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLineEdit, QTableWidget, QTableWidgetItem, 
-                               QLabel, QMessageBox, QHeaderView, QCheckBox)
+                               QLineEdit, QTableWidget, QTableWidgetItem,
+                               QLabel, QMessageBox, QHeaderView, QCheckBox,
+                               QSizePolicy, QScrollArea)
 from PySide6.QtCore import Qt
 from core.profiles_manager import ProfilesManager
 
@@ -24,8 +25,18 @@ class ProfilesTab(QWidget):
     
     def init_ui(self):
         """Inicializa la interfaz de usuario."""
-        layout = QVBoxLayout()
-        
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        main_layout.addWidget(scroll)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 20)
+
         # Título
         title = QLabel("Gestión de Perfiles")
         title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
@@ -39,6 +50,7 @@ class ProfilesTab(QWidget):
         self.name_input.setMinimumHeight(35)
         
         self.create_btn = QPushButton("Crear Perfil")
+        self.create_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.create_btn.setMinimumHeight(35)
         self.create_btn.clicked.connect(self.create_profile)
         
@@ -52,12 +64,14 @@ class ProfilesTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Nombre", "Activo", "Abrir Navegador", "Eliminar"])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.table.setMinimumHeight(400)
-        
+        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         layout.addWidget(self.table)
         
         # Información
@@ -65,7 +79,8 @@ class ProfilesTab(QWidget):
         info_label.setStyleSheet("color: #888; margin: 10px;")
         layout.addWidget(info_label)
         
-        self.setLayout(layout)
+        layout.addStretch()
+        scroll.setWidget(container)
     
     def create_profile(self):
         """Crea un nuevo perfil."""

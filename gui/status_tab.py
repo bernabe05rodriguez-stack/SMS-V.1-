@@ -4,8 +4,9 @@ Muestra el estado de las campañas y mensajes enviados.
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLabel, QTableWidget, QTableWidgetItem, 
-                               QHeaderView, QMessageBox)
+                               QLabel, QTableWidget, QTableWidgetItem,
+                               QHeaderView, QMessageBox, QScrollArea,
+                               QSizePolicy)
 from PySide6.QtCore import Qt
 from core.sending_engine import SendingEngine
 
@@ -21,7 +22,17 @@ class StatusTab(QWidget):
     
     def init_ui(self):
         """Inicializa la interfaz de usuario."""
-        layout = QVBoxLayout()
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        main_layout.addWidget(scroll)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 20)
         
         # Título
         title = QLabel("Estado de Envíos")
@@ -30,6 +41,7 @@ class StatusTab(QWidget):
         
         # Botón refrescar
         refresh_btn = QPushButton("Refrescar")
+        refresh_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         refresh_btn.setMaximumWidth(150)
         refresh_btn.clicked.connect(self.load_campaigns)
         layout.addWidget(refresh_btn)
@@ -58,6 +70,7 @@ class StatusTab(QWidget):
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
         
         self.table.setMinimumHeight(400)
+        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(self.table)
         
         # Información
@@ -69,7 +82,8 @@ class StatusTab(QWidget):
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
         
-        self.setLayout(layout)
+        layout.addStretch()
+        scroll.setWidget(container)
     
     def load_campaigns(self):
         """Carga las campañas en la tabla."""
