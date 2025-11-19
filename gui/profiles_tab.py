@@ -5,13 +5,16 @@ Permite crear, listar, activar/desactivar y abrir navegadores para cada perfil.
 
 import os
 import platform
+import shutil
 import subprocess
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLineEdit, QTableWidget, QTableWidgetItem,
                                QLabel, QMessageBox, QHeaderView, QCheckBox,
-                               QSizePolicy, QScrollArea)
+                               QSizePolicy, QScrollArea, QGroupBox,
+                               QFileDialog)
 from PySide6.QtCore import Qt
 from core.profiles_manager import ProfilesManager
+from core.excel_processor import ExcelProcessor
 
 
 class ProfilesTab(QWidget):
@@ -20,6 +23,8 @@ class ProfilesTab(QWidget):
     def __init__(self):
         super().__init__()
         self.profiles_manager = ProfilesManager()
+        self.excel_processor = ExcelProcessor()
+        self.last_uploaded_excel = None
         self.init_ui()
         self.load_profiles()
     
@@ -38,13 +43,21 @@ class ProfilesTab(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
 
         # Título
-        title = QLabel("Gestión de Perfiles")
+        title = QLabel("Perfiles activos y contactos")
         title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
-        
+
+        subtitle = QLabel(
+            "Gestioná tus líneas y carga un Excel en el mismo lugar."
+        )
+        subtitle.setStyleSheet("color: #b3b3b3; margin-bottom: 10px;")
+        layout.addWidget(subtitle)
+
         # Sección de crear nuevo perfil
-        create_layout = QHBoxLayout()
-        
+        create_group = QGroupBox("Crear perfil nuevo")
+        create_layout = QHBoxLayout(create_group)
+        create_layout.setSpacing(10)
+
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Nombre del nuevo perfil...")
         self.name_input.setMinimumHeight(35)
@@ -54,21 +67,44 @@ class ProfilesTab(QWidget):
         self.create_btn.setMinimumHeight(35)
         self.create_btn.clicked.connect(self.create_profile)
         
-        create_layout.addWidget(QLabel("Nombre:"))
         create_layout.addWidget(self.name_input)
         create_layout.addWidget(self.create_btn)
-        
-        layout.addLayout(create_layout)
-        
+
+        layout.addWidget(create_group)
+
+        # Bloque rápido para cargar Excel
+        excel_group = QGroupBox("Contactos desde Excel")
+        excel_layout = QVBoxLayout(excel_group)
+        excel_layout.setSpacing(6)
+
+        excel_info = QLabel(
+            "📥 Seleccioná tu archivo y lo procesamos automáticamente para que "
+            "esté listo en las campañas."
+        )
+        excel_info.setWordWrap(True)
+        excel_layout.addWidget(excel_info)
+
+        self.upload_excel_btn = QPushButton("Cargar y procesar Excel")
+        self.upload_excel_btn.setMinimumHeight(35)
+        self.upload_excel_btn.clicked.connect(self.upload_excel_file)
+        excel_layout.addWidget(self.upload_excel_btn)
+
+        self.excel_status_label = QLabel("Todavía no cargaste ningún archivo.")
+        self.excel_status_label.setStyleSheet("color: #bbbbbb;")
+        excel_layout.addWidget(self.excel_status_label)
+
+        layout.addWidget(excel_group)
+
         # Tabla de perfiles
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Nombre", "Activo", "Abrir Navegador", "Eliminar"])
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Perfil", "Activo", "Acciones"])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
         self.table.setMinimumHeight(400)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -125,21 +161,67 @@ class ProfilesTab(QWidget):
             checkbox_layout.addWidget(checkbox)
             self.table.setCellWidget(row, 1, checkbox_widget)
             
-            # Botón abrir navegador
-            open_btn = QPushButton("Abrir Chrome")
-            open_btn.clicked.connect(lambda checked, name=profile['nombre']: self.open_browser(name))
-            self.table.setCellWidget(row, 2, open_btn)
-            
-            # Botón eliminar
+            # Acciones
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(0, 0, 0, 0)
+            actions_layout.setSpacing(6)
+
+            open_btn = QPushButton("Abrir")
+            open_btn.setMinimumHeight(28)
+            open_btn.clicked.connect(
+                lambda checked, name=profile['nombre']: self.open_browser(name)
+            )
+            actions_layout.addWidget(open_btn)
+
             delete_btn = QPushButton("Eliminar")
             delete_btn.setStyleSheet("background-color: #c0392b; color: white;")
-            delete_btn.clicked.connect(lambda checked, name=profile['nombre']: self.delete_profile(name))
-            self.table.setCellWidget(row, 3, delete_btn)
-    
+            delete_btn.setMinimumHeight(28)
+            delete_btn.clicked.connect(
+                lambda checked, name=profile['nombre']: self.delete_profile(name)
+            )
+            actions_layout.addWidget(delete_btn)
+
+            self.table.setCellWidget(row, 2, actions_widget)
+
     def toggle_profile_status(self, name, state):
         """Cambia el estado activo de un perfil."""
-        active = (state == Qt.Checked.value)
+        active = (state == Qt.CheckState.Checked)
         self.profiles_manager.update_profile_status(name, active)
+
+    def upload_excel_file(self):
+        """Sube y procesa un archivo Excel/CSV desde el bloque de perfiles."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleccionar archivo Excel/CSV",
+            "",
+            "Archivos Excel/CSV (*.xlsx *.xls *.csv)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            filename = os.path.basename(file_path)
+            dest_path = os.path.join(self.excel_processor.uploads_dir, filename)
+            shutil.copy2(file_path, dest_path)
+
+            success, message, count = self.excel_processor.process_file(filename)
+
+            if success:
+                self.last_uploaded_excel = filename
+                self.excel_status_label.setText(
+                    f"✅ '{filename}' procesado ({count} registros)."
+                )
+                QMessageBox.information(self, "Excel procesado", message)
+            else:
+                QMessageBox.critical(self, "Error", message)
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo cargar el archivo:\n{str(e)}"
+            )
     
     def open_browser(self, profile_name):
         """Abre Chrome con el perfil específico en Google Messages."""
