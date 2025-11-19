@@ -4,6 +4,8 @@ Permite crear campañas seleccionando plantillas, perfiles y contactos.
 Diseño moderno y atractivo.
 """
 
+from html import escape
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QTextEdit, QLineEdit, QComboBox,
                                QSpinBox, QMessageBox, QGroupBox,
@@ -146,33 +148,36 @@ class CampaignsTab(QWidget):
         variables_group = QGroupBox("🏷️ Variables Disponibles")
         variables_group.setStyleSheet("""
             QGroupBox {
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
-                border: 2px solid #9b59b6;
+                border: 1px solid #9b59b6;
                 border-radius: 10px;
-                margin-top: 16px;
-                padding-top: 16px;
+                margin-top: 12px;
+                padding-top: 12px;
+                background: #faf6ff;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 8px;
-                color: #9b59b6;
+                left: 12px;
+                padding: 0 6px;
+                color: #8e44ad;
             }
         """)
         variables_layout = QVBoxLayout()
+        variables_layout.setContentsMargins(10, 8, 10, 10)
+        variables_layout.setSpacing(6)
 
         self.variables_label = QLabel(
             "💡 Subí un Excel desde Perfiles para ver las variables disponibles."
         )
-        self.variables_label.setStyleSheet("color: #95a5a6; font-style: italic; padding: 8px;")
+        self.variables_label.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 4px 0;")
         self.variables_label.setWordWrap(True)
         variables_layout.addWidget(self.variables_label)
 
         # Contenedor scrollable para variables
         variables_scroll = QScrollArea()
         variables_scroll.setWidgetResizable(True)
-        variables_scroll.setMaximumHeight(100)
+        variables_scroll.setMaximumHeight(80)
         variables_scroll.setStyleSheet("""
             QScrollArea {
                 border: none;
@@ -183,6 +188,8 @@ class CampaignsTab(QWidget):
         self.variables_widget = QWidget()
         self.variables_layout = QHBoxLayout(self.variables_widget)
         self.variables_layout.setAlignment(Qt.AlignLeft)
+        self.variables_layout.setSpacing(4)
+        self.variables_layout.setContentsMargins(2, 2, 2, 2)
         variables_scroll.setWidget(self.variables_widget)
 
         variables_layout.addWidget(variables_scroll)
@@ -214,7 +221,17 @@ class CampaignsTab(QWidget):
         selector_layout.addWidget(QLabel("📋 Plantilla:"))
 
         self.template_combo = QComboBox()
-        self.template_combo.setMinimumHeight(40)
+        self.template_combo.setMinimumHeight(32)
+        self.template_combo.setStyleSheet("""
+            QComboBox {
+                padding: 4px 8px;
+                font-size: 12px;
+                border: 1px solid #bdc3c7;
+                border-radius: 6px;
+                background: #f7f9f9;
+            }
+            QComboBox::drop-down { width: 20px; }
+        """)
         self.template_combo.currentTextChanged.connect(self.load_template_content)
         selector_layout.addWidget(self.template_combo)
 
@@ -230,38 +247,79 @@ class CampaignsTab(QWidget):
             QTextEdit {
                 font-size: 14px;
                 line-height: 1.5;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 6px;
             }
         """)
+        self.template_editor.textChanged.connect(self.update_preview)
         templates_layout.addWidget(self.template_editor)
+
+        # Vista previa del mensaje
+        preview_group = QGroupBox("👀 Vista previa")
+        preview_group.setStyleSheet("""
+            QGroupBox {
+                font-size: 13px;
+                font-weight: 600;
+                border: 1px dashed #27ae60;
+                border-radius: 8px;
+                margin-top: 8px;
+                padding-top: 10px;
+                background: #f8fffa;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 6px;
+                color: #27ae60;
+            }
+        """)
+        preview_layout = QVBoxLayout()
+        preview_layout.setContentsMargins(10, 6, 10, 10)
+        self.preview_label = QLabel("Escribe el mensaje para ver la vista previa.")
+        self.preview_label.setWordWrap(True)
+        self.preview_label.setStyleSheet(
+            "background: white; border: 1px solid #ecf0f1; border-radius: 6px;"
+            "padding: 10px; color: #2c3e50; font-size: 13px;"
+        )
+        preview_layout.addWidget(self.preview_label)
+        preview_group.setLayout(preview_layout)
+        templates_layout.addWidget(preview_group)
 
         # Botones de plantilla
         template_buttons = QHBoxLayout()
 
-        self.save_template_btn = QPushButton("💾 Guardar como nueva plantilla")
-        self.save_template_btn.setMinimumHeight(40)
+        self.save_template_btn = QPushButton("💾 Guardar plantilla")
+        self.save_template_btn.setMinimumHeight(30)
         self.save_template_btn.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #27ae60, stop:1 #229954);
+                background: #f5f7f7;
+                color: #2c3e50;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                font-size: 12px;
+                padding: 4px 10px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #2ecc71, stop:1 #27ae60);
+                background: #eef2f3;
             }
         """)
         self.save_template_btn.clicked.connect(self.save_new_template)
         template_buttons.addWidget(self.save_template_btn)
 
-        self.delete_template_btn = QPushButton("🗑️ Eliminar plantilla")
-        self.delete_template_btn.setMinimumHeight(40)
+        self.delete_template_btn = QPushButton("🗑️ Eliminar")
+        self.delete_template_btn.setMinimumHeight(30)
         self.delete_template_btn.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #e74c3c, stop:1 #c0392b);
+                background: #fdf2f2;
+                color: #7f8c8d;
+                border: 1px solid #e6dddd;
+                border-radius: 6px;
+                font-size: 12px;
+                padding: 4px 10px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #ec7063, stop:1 #e74c3c);
+                background: #f7eaea;
             }
         """)
         self.delete_template_btn.clicked.connect(self.delete_template)
@@ -377,6 +435,7 @@ class CampaignsTab(QWidget):
                 child = self.variables_layout.takeAt(0)
                 if child.widget():
                     child.widget().deleteLater()
+            self.update_preview()
             return
 
         # Cargar archivo procesado
@@ -402,28 +461,48 @@ class CampaignsTab(QWidget):
             btn = QPushButton(f"{{{column}}}")
             btn.setStyleSheet("""
                 QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #9b59b6, stop:1 #8e44ad);
-                    color: white;
-                    padding: 8px 14px;
-                    margin: 3px;
+                    background: #f1ecf9;
+                    color: #5b2c6f;
+                    padding: 4px 8px;
+                    margin: 2px;
                     border-radius: 6px;
                     font-weight: 600;
-                    font-size: 12px;
+                    font-size: 11px;
+                    border: 1px solid #e6def5;
                 }
                 QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #af7ac5, stop:1 #9b59b6);
+                    background: #e8def6;
                 }
             """)
             btn.clicked.connect(lambda checked, col=column: self.insert_variable(col))
             self.variables_layout.addWidget(btn)
+
+        self.update_preview()
 
     def insert_variable(self, column_name):
         """Inserta una variable en el editor de plantilla."""
         cursor = self.template_editor.textCursor()
         cursor.insertText(f"{{{column_name}}}")
         self.template_editor.setFocus()
+        self.update_preview()
+
+    def update_preview(self):
+        """Actualiza la vista previa del mensaje."""
+        content = self.template_editor.toPlainText()
+        if not content:
+            self.preview_label.setText("Escribe el mensaje para ver la vista previa.")
+            return
+
+        preview_content = escape(content)
+        for column in self.available_columns:
+            placeholder = escape(f"{{{column}}}")
+            preview_content = preview_content.replace(
+                placeholder,
+                f"<span style='color:#27ae60;font-weight:700;'>{{{column}}}</span>"
+            )
+
+        preview_content = preview_content.replace("\n", "<br>")
+        self.preview_label.setText(preview_content)
 
     def get_selected_profiles(self):
         """Retorna los nombres de perfiles marcados."""
@@ -483,6 +562,7 @@ class CampaignsTab(QWidget):
         template = self.templates_manager.get_template_by_name(template_name)
         if template:
             self.template_editor.setPlainText(template['contenido'])
+            self.update_preview()
 
     def save_new_template(self):
         """Guarda el contenido actual como una nueva plantilla."""
