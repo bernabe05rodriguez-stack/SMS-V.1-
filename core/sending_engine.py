@@ -398,115 +398,75 @@ class SendingEngine:
                 return False
 
             # Paso 3: pegar inmediatamente el número tal como indican las instrucciones
+            log("   📋 Pegando número directamente en el campo activo")
+            active_target = driver.switch_to.active_element
             try:
-                driver.switch_to.active_element.send_keys(Keys.CONTROL, "a")
-                driver.switch_to.active_element.send_keys(Keys.BACKSPACE)
-                driver.switch_to.active_element.send_keys(phone)
+                active_target.send_keys(phone)
             except Exception:
+                log("   ⚠️ No se pudo pegar en el campo activo, intentando con el campo 'To'")
                 to_field.click()
-                to_field.send_keys(Keys.CONTROL, "a")
-                to_field.send_keys(Keys.BACKSPACE)
                 to_field.send_keys(phone)
 
             # Paso 4: seleccionar el contacto con Enter
-            to_field.send_keys(Keys.ENTER)
+            try:
+                driver.switch_to.active_element.send_keys(Keys.ENTER)
+            except Exception:
+                to_field.send_keys(Keys.ENTER)
 
             # Paso 5: esperar 2 segundos antes de pegar el mensaje
             time.sleep(2)
 
-            # Ahora buscar el campo de texto del mensaje
-            log(f"   📝 Buscando campo de mensaje...")
-
-            text_field_selectors = [
-                "//div[@contenteditable='true' and @role='textbox']",
-                "//div[@contenteditable='true' and contains(@aria-label, 'Text')]",
-                "//div[@contenteditable='true' and contains(@aria-label, 'Mensaje')]",
-                "//div[@contenteditable='true']",
-                "//textarea[@placeholder='Text message']",
-                "//textarea[@placeholder='Mensaje de texto']",
-                "//mw-message-compose-editor//div[@contenteditable='true']",
-                "//textarea[@aria-label='Mensaje']",
-                "//textarea[@aria-label='Text message']",
-                "//div[@aria-label='Escribe un mensaje']",
-                "//div[@aria-label='Message']",
-                "//div[@role='textbox' and contains(@aria-label, 'message')]",
-                "//div[contains(@data-placeholder, 'mensaje')]",
-            ]
-
-            def wait_for_text_field(timeout=15):
-                end_time = time.time() + timeout
-
-                def find_text_field():
-                    local_text_field = None
-                    for selector in text_field_selectors:
-                        try:
-                            local_text_field = wait.until(
-                                EC.element_to_be_clickable((By.XPATH, selector))
-                            )
-                            if local_text_field:
-                                log(f"   ✅ Campo de mensaje encontrado")
-                                break
-                        except Exception:
-                            continue
-
-                    if not local_text_field:
-                        # Fallback: intentar localizar cualquier campo editable visible
-                        try:
-                            editable_candidates = driver.find_elements(
-                                By.CSS_SELECTOR, "div[contenteditable='true']"
-                            )
-                            for candidate in editable_candidates:
-                                if candidate.is_displayed() and candidate.is_enabled():
-                                    local_text_field = candidate
-                                    log("   ✅ Campo de mensaje encontrado por búsqueda alternativa")
-                                    break
-                        except Exception:
-                            pass
-
-                    return local_text_field
-
-                while time.time() < end_time:
-                    local_text_field = find_text_field()
-                    if local_text_field:
-                        return local_text_field
-                    time.sleep(0.7)
-
-                return None
-
-            text_field = wait_for_text_field()
-
-            if not text_field:
-                log("   ⚠️ No se abrió la conversación, reintentando...")
-                to_field.send_keys(Keys.ENTER)
-                time.sleep(1)
-                text_field = wait_for_text_field(timeout=8)
-
-            if not text_field:
-                log(f"   ❌ No se encontró el campo de mensaje")
-                return False
-            
-            # Escribir el mensaje
-            log(f"   ✍️ Escribiendo mensaje...")
-            text_field.click()
-            time.sleep(0.5)
-
+            # Paso 5: pegar el mensaje sin mover el foco manualmente
+            log(f"   ✍️ Pegando mensaje en el campo actual")
+            message_target = driver.switch_to.active_element
             try:
-                driver.execute_script("arguments[0].focus();", text_field)
+                message_target.send_keys(message)
             except Exception:
-                pass
+                # Si falla, buscar el campo de texto como respaldo
+                log("   ⚠️ No se pudo pegar en el campo activo, buscando campo de mensaje...")
+                text_field_selectors = [
+                    "//div[@contenteditable='true' and @role='textbox']",
+                    "//div[@contenteditable='true' and contains(@aria-label, 'Text')]",
+                    "//div[@contenteditable='true' and contains(@aria-label, 'Mensaje')]",
+                    "//div[@contenteditable='true']",
+                    "//textarea[@placeholder='Text message']",
+                    "//textarea[@placeholder='Mensaje de texto']",
+                    "//mw-message-compose-editor//div[@contenteditable='true']",
+                    "//textarea[@aria-label='Mensaje']",
+                    "//textarea[@aria-label='Text message']",
+                    "//div[@aria-label='Escribe un mensaje']",
+                    "//div[@aria-label='Message']",
+                    "//div[@role='textbox' and contains(@aria-label, 'message')]",
+                    "//div[contains(@data-placeholder, 'mensaje')]",
+                ]
 
-            # Usar ActionChains para escribir el mensaje
-            actions = ActionChains(driver)
-            actions.move_to_element(text_field)
-            actions.click()
-            actions.send_keys(message)
-            actions.perform()
+                message_target = None
+                for selector in text_field_selectors:
+                    try:
+                        message_target = wait.until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        if message_target:
+                            log("   ✅ Campo de mensaje encontrado como respaldo")
+                            break
+                    except Exception:
+                        continue
+
+                if not message_target:
+                    log("   ❌ No se pudo localizar un campo de mensaje para pegar el texto")
+                    return False
+
+                try:
+                    message_target.click()
+                except Exception:
+                    pass
+                message_target.send_keys(message)
 
             # Paso 6: esperar 2 segundos y enviar con Enter
             log("   ⏳ Esperando 2 segundos antes de enviar...")
             time.sleep(2)
             try:
-                text_field.send_keys(Keys.ENTER)
+                driver.switch_to.active_element.send_keys(Keys.ENTER)
                 log("   ✅ Enter enviado para mandar el mensaje")
             except Exception:
                 # Fallback: intentar localizar botón de enviar
