@@ -4,7 +4,7 @@ Pestaña de procesamiento de Excel y gestión de contactos.
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QTextEdit,
-                               QFileDialog)
+                               QFileDialog, QSizePolicy, QScrollArea)
 from PySide6.QtCore import Qt
 from core.excel_processor import ExcelProcessor
 import shutil
@@ -22,7 +22,17 @@ class ExcelTab(QWidget):
     
     def init_ui(self):
         """Inicializa la interfaz de usuario."""
-        layout = QVBoxLayout()
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        main_layout.addWidget(scroll)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 20)
         
         # Título
         title = QLabel("Procesamiento de Excel / Contactos")
@@ -31,6 +41,7 @@ class ExcelTab(QWidget):
         
         # Botón para subir archivo
         upload_btn = QPushButton("Subir archivo Excel/CSV")
+        upload_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         upload_btn.setMinimumHeight(40)
         upload_btn.clicked.connect(self.upload_file)
         layout.addWidget(upload_btn)
@@ -39,11 +50,13 @@ class ExcelTab(QWidget):
         layout.addWidget(QLabel("Archivos subidos:"))
         
         self.uploaded_list = QListWidget()
-        self.uploaded_list.setMaximumHeight(150)
+        self.uploaded_list.setMinimumHeight(150)
+        self.uploaded_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(self.uploaded_list)
         
         # Botón procesar
         process_btn = QPushButton("Procesar archivo seleccionado")
+        process_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         process_btn.setMinimumHeight(40)
         process_btn.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold;")
         process_btn.clicked.connect(self.process_selected_file)
@@ -53,7 +66,8 @@ class ExcelTab(QWidget):
         layout.addWidget(QLabel("Archivos procesados:"))
         
         self.processed_list = QListWidget()
-        self.processed_list.setMaximumHeight(150)
+        self.processed_list.setMinimumHeight(150)
+        self.processed_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(self.processed_list)
         
         # Información de procesamiento
@@ -61,7 +75,8 @@ class ExcelTab(QWidget):
         
         self.info_text = QTextEdit()
         self.info_text.setReadOnly(True)
-        self.info_text.setMaximumHeight(150)
+        self.info_text.setMinimumHeight(150)
+        self.info_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.info_text.setPlainText(
             "📋 Reglas aplicadas al procesar:\n\n"
             "• Se usa la columna Telefono_1 por defecto\n"
@@ -71,8 +86,9 @@ class ExcelTab(QWidget):
             "• El resultado se guarda como JSON en data/processed/\n"
         )
         layout.addWidget(self.info_text)
-        
-        self.setLayout(layout)
+
+        layout.addStretch()
+        scroll.setWidget(container)
     
     def upload_file(self):
         """Permite al usuario subir un archivo Excel/CSV."""

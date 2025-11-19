@@ -51,7 +51,15 @@ class CampaignsTab(QWidget):
     
     def init_ui(self):
         """Inicializa la interfaz de usuario."""
-        layout = QVBoxLayout()
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        main_scroll = QScrollArea()
+        main_scroll.setWidgetResizable(True)
+        main_layout.addWidget(main_scroll)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
         
@@ -158,22 +166,22 @@ class CampaignsTab(QWidget):
         variables_layout.addWidget(self.variables_label)
         
         # Contenedor scrollable para variables
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setMaximumHeight(100)
-        scroll.setStyleSheet("""
+        variables_scroll = QScrollArea()
+        variables_scroll.setWidgetResizable(True)
+        variables_scroll.setMaximumHeight(100)
+        variables_scroll.setStyleSheet("""
             QScrollArea {
                 border: none;
                 background: transparent;
             }
         """)
-        
+
         self.variables_widget = QWidget()
         self.variables_layout = QHBoxLayout(self.variables_widget)
         self.variables_layout.setAlignment(Qt.AlignLeft)
-        scroll.setWidget(self.variables_widget)
-        
-        variables_layout.addWidget(scroll)
+        variables_scroll.setWidget(self.variables_widget)
+
+        variables_layout.addWidget(variables_scroll)
         variables_group.setLayout(variables_layout)
         layout.addWidget(variables_group)
         
@@ -351,8 +359,9 @@ class CampaignsTab(QWidget):
             }
         """)
         layout.addWidget(self.log_text)
-        
-        self.setLayout(layout)
+
+        layout.addStretch()
+        main_scroll.setWidget(container)
     
     def load_available_columns(self, filename):
         """Carga las columnas disponibles del archivo seleccionado."""
