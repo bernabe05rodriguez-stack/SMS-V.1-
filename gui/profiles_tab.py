@@ -134,6 +134,48 @@ class ProfilesTab(QWidget):
         profiles = self.profiles_manager.get_profiles()
         self.table.setRowCount(len(profiles))
 
+        button_style = (
+            "QPushButton {"
+            "background-color: #12354a;"
+            "color: white;"
+            "border: 2px solid #1f5c7a;"
+            "border-radius: 10px;"
+            "padding: 4px 14px;"
+            "font-weight: 600;"
+            "}"
+            "QPushButton:hover {"
+            "background-color: #1d4f6d;"
+            "}"
+        )
+
+        secondary_style = (
+            "QPushButton {"
+            "background-color: #2c3e50;"
+            "color: white;"
+            "border: 2px solid #3d566e;"
+            "border-radius: 10px;"
+            "padding: 4px 14px;"
+            "font-weight: 600;"
+            "}"
+            "QPushButton:hover {"
+            "background-color: #34495e;"
+            "}"
+        )
+
+        danger_style = (
+            "QPushButton {"
+            "background-color: #c0392b;"
+            "color: white;"
+            "border: 2px solid #e74c3c;"
+            "border-radius: 10px;"
+            "padding: 4px 14px;"
+            "font-weight: 600;"
+            "}"
+            "QPushButton:hover {"
+            "background-color: #a93226;"
+            "}"
+        )
+
         for row, profile in enumerate(profiles):
             # Nombre
             name_item = QTableWidgetItem(profile['nombre'])
@@ -144,25 +186,27 @@ class ProfilesTab(QWidget):
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
             actions_layout.setContentsMargins(0, 0, 0, 0)
-            actions_layout.setSpacing(6)
+            actions_layout.setSpacing(10)
 
             open_btn = QPushButton("Abrir")
-            open_btn.setMinimumHeight(28)
+            open_btn.setMinimumHeight(32)
+            open_btn.setStyleSheet(button_style)
             open_btn.clicked.connect(
                 lambda checked, name=profile['nombre']: self.open_browser(name)
             )
             actions_layout.addWidget(open_btn)
 
             close_btn = QPushButton("Cerrar")
-            close_btn.setMinimumHeight(28)
+            close_btn.setMinimumHeight(32)
+            close_btn.setStyleSheet(secondary_style)
             close_btn.clicked.connect(
                 lambda checked, name=profile['nombre']: self.close_browser(name)
             )
             actions_layout.addWidget(close_btn)
 
             delete_btn = QPushButton("Eliminar")
-            delete_btn.setStyleSheet("background-color: #c0392b; color: white;")
-            delete_btn.setMinimumHeight(28)
+            delete_btn.setStyleSheet(danger_style)
+            delete_btn.setMinimumHeight(32)
             delete_btn.clicked.connect(
                 lambda checked, name=profile['nombre']: self.delete_profile(name)
             )
