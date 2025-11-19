@@ -7,7 +7,6 @@ from PySide6.QtWidgets import QMainWindow, QTabWidget, QWidget
 from PySide6.QtGui import QPalette, QColor, QFont
 from PySide6.QtCore import Qt
 from gui.profiles_tab import ProfilesTab
-from gui.excel_tab import ExcelTab
 from gui.campaigns_tab import CampaignsTab
 from gui.status_tab import StatusTab
 
@@ -62,13 +61,11 @@ class MainWindow(QMainWindow):
         
         # Crear e inicializar pestañas
         self.profiles_tab = ProfilesTab()
-        self.excel_tab = ExcelTab()
         self.campaigns_tab = CampaignsTab()
         self.status_tab = StatusTab()
-        
+
         # Agregar pestañas al widget con iconos
         self.tabs.addTab(self.profiles_tab, "👤 Perfiles")
-        self.tabs.addTab(self.excel_tab, "📊 Excel / Contactos")
         self.tabs.addTab(self.campaigns_tab, "🚀 Campañas")
         self.tabs.addTab(self.status_tab, "📈 Estado de Envíos")
     

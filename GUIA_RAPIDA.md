@@ -52,11 +52,11 @@ python main.py
 
 ### Paso 3: Subir Contactos
 
-1. Ve a la pestaña **"Excel / Contactos"**
-2. Clic en **"Subir archivo Excel/CSV"**
+1. Ve a la pestaña **"Perfiles"** y ubica el bloque **"Contactos desde Excel"**
+2. Clic en **"Cargar y procesar Excel"**
 3. Selecciona tu archivo (usa `EJEMPLO_CONTACTOS.csv` para probar)
-4. Selecciona el archivo en la lista
-5. Clic en **"Procesar archivo seleccionado"**
+4. Espera el mensaje de confirmación con la cantidad de registros cargados
+5. ¡Listo! Ese Excel ya aparece disponible en la pestaña **Campañas**
 
 ---
 
