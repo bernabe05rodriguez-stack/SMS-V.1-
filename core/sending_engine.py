@@ -8,6 +8,7 @@ import os
 import time
 import platform
 import subprocess
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -44,7 +45,8 @@ class SendingEngine:
                 - template_content: Contenido de la plantilla
                 - profiles: Lista de perfiles activos
                 - contacts_file: Archivo de contactos procesados
-                - delay: Delay entre mensajes en segundos
+                - delay_min: Delay mínimo entre mensajes en segundos
+                - delay_max: Delay máximo entre mensajes en segundos
                 
         Returns:
             tuple: (success, message)
@@ -60,7 +62,8 @@ class SendingEngine:
                 "template_content": campaign_data['template_content'],
                 "profiles": campaign_data['profiles'],
                 "contacts_file": campaign_data['contacts_file'],
-                "delay": campaign_data['delay'],
+                "delay_min": campaign_data['delay_min'],
+                "delay_max": campaign_data['delay_max'],
                 "created_at": datetime.now().isoformat(),
                 "status": "created",
                 "total_messages": 0,
@@ -189,6 +192,9 @@ class SendingEngine:
             if not profile_names:
                 return False, "No hay perfiles disponibles"
             
+            delay_min = max(1, campaign.get('delay_min', 1))
+            delay_max = max(delay_min, campaign.get('delay_max', delay_min))
+
             for idx, contact in enumerate(contacts, 1):
                 # Rotar entre perfiles
                 profile_name = profile_names[profile_index % len(profile_names)]
@@ -222,8 +228,10 @@ class SendingEngine:
                     
                     # Delay entre mensajes
                     if idx < len(contacts):
-                        log(f"   ⏱️ Esperando {campaign['delay']} segundos...")
-                        time.sleep(campaign['delay'])
+                        delay_seconds = random.uniform(delay_min, delay_max)
+                        delay_seconds = max(1, delay_seconds)
+                        log(f"   ⏱️ Esperando {delay_seconds:.1f} segundos...")
+                        time.sleep(delay_seconds)
                     
                     # Rotar al siguiente perfil
                     profile_index += 1

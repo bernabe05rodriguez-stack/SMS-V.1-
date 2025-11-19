@@ -160,6 +160,18 @@ class ExcelProcessor:
             if file.endswith('.json'):
                 files.append(file)
         return files
+
+    def get_latest_processed_file(self):
+        """Retorna el archivo procesado más reciente según fecha de modificación."""
+        processed_files = self.get_processed_files()
+
+        if not processed_files:
+            return None
+
+        def file_mtime(filename):
+            return os.path.getmtime(os.path.join(self.processed_dir, filename))
+
+        return max(processed_files, key=file_mtime)
     
     def load_processed_file(self, filename):
         """Carga un archivo procesado."""

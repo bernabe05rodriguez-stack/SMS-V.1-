@@ -5,7 +5,7 @@ Diseño moderno y atractivo.
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLabel, QComboBox, QTextEdit, QLineEdit,
+                               QLabel, QTextEdit, QLineEdit,
                                QSpinBox, QMessageBox, QGroupBox,
                                QFormLayout, QCheckBox, QScrollArea)
 from PySide6.QtCore import Qt, QThread, Signal
@@ -19,12 +19,12 @@ class SendingThread(QThread):
     """Thread para envío de mensajes en segundo plano."""
     progress = Signal(str)
     finished = Signal(bool, str)
-    
+
     def __init__(self, campaign_id, sending_engine):
         super().__init__()
         self.campaign_id = campaign_id
         self.sending_engine = sending_engine
-    
+
     def run(self):
         """Ejecuta el envío de la campaña."""
         try:
@@ -45,11 +45,12 @@ class CampaignsTab(QWidget):
         self.excel_processor = ExcelProcessor()
         self.sending_engine = SendingEngine()
         self.sending_thread = None
+        self.current_contacts_file = None
         self.available_columns = []
-        
+
         self.init_ui()
         self.refresh_data()
-    
+
     def init_ui(self):
         """Inicializa la interfaz de usuario."""
         main_layout = QVBoxLayout(self)
@@ -63,7 +64,7 @@ class CampaignsTab(QWidget):
         layout = QVBoxLayout(container)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
-        
+
         # Título con estilo
         title = QLabel("🚀 Gestión de Campañas")
         title.setStyleSheet("""
@@ -73,11 +74,11 @@ class CampaignsTab(QWidget):
             margin-bottom: 10px;
         """)
         layout.addWidget(title)
-        
+
         subtitle = QLabel("Configura y envía tus campañas de SMS de forma automática")
         subtitle.setStyleSheet("color: #95a5a6; font-size: 13px; margin-bottom: 10px;")
         layout.addWidget(subtitle)
-        
+
         # Sección de configuración de campaña
         config_group = QGroupBox("⚙️ Configuración Básica")
         config_group.setStyleSheet("""
@@ -98,49 +99,49 @@ class CampaignsTab(QWidget):
         """)
         config_layout = QFormLayout()
         config_layout.setSpacing(12)
-        
+
         # Nombre de campaña
         self.campaign_name_input = QLineEdit()
         self.campaign_name_input.setPlaceholderText("Ej: Campaña Enero 2025")
         self.campaign_name_input.setMinimumHeight(40)
         config_layout.addRow("📝 Nombre:", self.campaign_name_input)
-        
-        # Archivo de contactos
-        contacts_layout = QHBoxLayout()
-        self.contacts_combo = QComboBox()
-        self.contacts_combo.setMinimumHeight(40)
-        self.contacts_combo.currentTextChanged.connect(self.load_available_columns)
-        contacts_layout.addWidget(self.contacts_combo)
-        
-        refresh_btn = QPushButton("🔄")
-        refresh_btn.setMaximumWidth(50)
-        refresh_btn.setMinimumHeight(40)
-        refresh_btn.setStyleSheet("""
-            QPushButton {
-                background: #34495e;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background: #3498db;
-            }
-        """)
-        refresh_btn.clicked.connect(self.refresh_data)
-        contacts_layout.addWidget(refresh_btn)
-        
-        config_layout.addRow("📊 Lista de contactos:", contacts_layout)
-        
+
+        # Información de contactos automática
+        self.contacts_info_label = QLabel(
+            "Se usará automáticamente el último Excel procesado desde la pestaña Perfiles."
+        )
+        self.contacts_info_label.setWordWrap(True)
+        self.contacts_info_label.setStyleSheet("color: #95a5a6;")
+        config_layout.addRow("📊 Contactos:", self.contacts_info_label)
+
         # Delay entre mensajes
-        self.delay_spin = QSpinBox()
-        self.delay_spin.setMinimum(1)
-        self.delay_spin.setMaximum(300)
-        self.delay_spin.setValue(5)
-        self.delay_spin.setSuffix(" segundos")
-        self.delay_spin.setMinimumHeight(40)
-        config_layout.addRow("⏱️ Delay entre mensajes:", self.delay_spin)
-        
+        delay_layout = QHBoxLayout()
+        self.delay_min_spin = QSpinBox()
+        self.delay_min_spin.setMinimum(1)
+        self.delay_min_spin.setMaximum(300)
+        self.delay_min_spin.setValue(3)
+        self.delay_min_spin.setSuffix(" seg")
+        self.delay_min_spin.setMinimumHeight(40)
+        self.delay_min_spin.valueChanged.connect(self.sync_delay_bounds)
+        delay_layout.addWidget(QLabel("Entre"))
+        delay_layout.addWidget(self.delay_min_spin)
+
+        self.delay_max_spin = QSpinBox()
+        self.delay_max_spin.setMinimum(1)
+        self.delay_max_spin.setMaximum(300)
+        self.delay_max_spin.setValue(8)
+        self.delay_max_spin.setSuffix(" seg")
+        self.delay_max_spin.setMinimumHeight(40)
+        self.delay_max_spin.valueChanged.connect(self.sync_delay_bounds)
+        delay_layout.addWidget(QLabel("y"))
+        delay_layout.addWidget(self.delay_max_spin)
+
+        self.sync_delay_bounds()
+
+        config_layout.addRow("⏱️ Delay entre mensajes:", delay_layout)
+
         config_group.setLayout(config_layout)
-        layout.addWidget(config_group)
-        
+
         # Sección de variables disponibles
         variables_group = QGroupBox("🏷️ Variables Disponibles")
         variables_group.setStyleSheet("""
@@ -160,12 +161,14 @@ class CampaignsTab(QWidget):
             }
         """)
         variables_layout = QVBoxLayout()
-        
-        self.variables_label = QLabel("💡 Selecciona un archivo de contactos para ver las variables")
+
+        self.variables_label = QLabel(
+            "💡 Subí un Excel desde Perfiles para ver las variables disponibles."
+        )
         self.variables_label.setStyleSheet("color: #95a5a6; font-style: italic; padding: 8px;")
         self.variables_label.setWordWrap(True)
         variables_layout.addWidget(self.variables_label)
-        
+
         # Contenedor scrollable para variables
         variables_scroll = QScrollArea()
         variables_scroll.setWidgetResizable(True)
@@ -185,7 +188,7 @@ class CampaignsTab(QWidget):
         variables_layout.addWidget(variables_scroll)
         variables_group.setLayout(variables_layout)
         layout.addWidget(variables_group)
-        
+
         # Sección de plantillas
         templates_group = QGroupBox("✍️ Mensaje de la Campaña")
         templates_group.setStyleSheet("""
@@ -205,21 +208,21 @@ class CampaignsTab(QWidget):
             }
         """)
         templates_layout = QVBoxLayout()
-        
+
         # Selector de plantilla
         selector_layout = QHBoxLayout()
         selector_layout.addWidget(QLabel("📋 Plantilla:"))
-        
+
         self.template_combo = QComboBox()
         self.template_combo.setMinimumHeight(40)
         self.template_combo.currentTextChanged.connect(self.load_template_content)
         selector_layout.addWidget(self.template_combo)
-        
+
         templates_layout.addLayout(selector_layout)
-        
+
         # Editor de plantilla
         templates_layout.addWidget(QLabel("✏️ Contenido (haz clic en las variables para insertarlas):"))
-        
+
         self.template_editor = QTextEdit()
         self.template_editor.setMinimumHeight(140)
         self.template_editor.setPlaceholderText("Ejemplo: Hola {Nombre}, tu saldo es {$ Asig.}")
@@ -230,10 +233,10 @@ class CampaignsTab(QWidget):
             }
         """)
         templates_layout.addWidget(self.template_editor)
-        
+
         # Botones de plantilla
         template_buttons = QHBoxLayout()
-        
+
         self.save_template_btn = QPushButton("💾 Guardar como nueva plantilla")
         self.save_template_btn.setMinimumHeight(40)
         self.save_template_btn.setStyleSheet("""
@@ -248,7 +251,7 @@ class CampaignsTab(QWidget):
         """)
         self.save_template_btn.clicked.connect(self.save_new_template)
         template_buttons.addWidget(self.save_template_btn)
-        
+
         self.delete_template_btn = QPushButton("🗑️ Eliminar plantilla")
         self.delete_template_btn.setMinimumHeight(40)
         self.delete_template_btn.setStyleSheet("""
@@ -263,12 +266,15 @@ class CampaignsTab(QWidget):
         """)
         self.delete_template_btn.clicked.connect(self.delete_template)
         template_buttons.addWidget(self.delete_template_btn)
-        
+
         templates_layout.addLayout(template_buttons)
-        
+
         templates_group.setLayout(templates_layout)
         layout.addWidget(templates_group)
-        
+
+        # Configuración básica (reubicada debajo del mensaje)
+        layout.addWidget(config_group)
+
         # Perfiles activos - CON SELECCIÓN MÚLTIPLE
         profiles_group = QGroupBox("👥 Seleccionar Perfiles")
         profiles_group.setStyleSheet("""
@@ -304,14 +310,14 @@ class CampaignsTab(QWidget):
         profiles_scroll.setMaximumHeight(150)
         profiles_scroll.setWidget(self.profiles_container)
         profiles_layout.addWidget(profiles_scroll)
-        
+
         profiles_group.setLayout(profiles_layout)
         layout.addWidget(profiles_group)
-        
+
         # Botones de acción
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(12)
-        
+
         # Botón crear campaña
         create_campaign_btn = QPushButton("💾 Crear Campaña")
         create_campaign_btn.setMinimumHeight(55)
@@ -329,7 +335,7 @@ class CampaignsTab(QWidget):
         """)
         create_campaign_btn.clicked.connect(self.create_campaign)
         buttons_layout.addWidget(create_campaign_btn)
-        
+
         # Botón enviar ahora
         self.send_now_btn = QPushButton("🚀 ENVIAR AHORA")
         self.send_now_btn.setMinimumHeight(55)
@@ -347,7 +353,7 @@ class CampaignsTab(QWidget):
         """)
         self.send_now_btn.clicked.connect(self.send_now)
         buttons_layout.addWidget(self.send_now_btn)
-        
+
         layout.addLayout(buttons_layout)
 
         # Recordatorio de progreso
@@ -359,36 +365,38 @@ class CampaignsTab(QWidget):
 
         layout.addStretch()
         main_scroll.setWidget(container)
-    
+
     def load_available_columns(self, filename):
         """Carga las columnas disponibles del archivo seleccionado."""
         if not filename:
-            self.variables_label.setText("💡 Selecciona un archivo de contactos para ver las variables")
+            self.variables_label.setText(
+                "💡 Subí un Excel desde Perfiles para ver las variables disponibles."
+            )
             # Limpiar botones de variables
             while self.variables_layout.count():
                 child = self.variables_layout.takeAt(0)
                 if child.widget():
                     child.widget().deleteLater()
             return
-        
+
         # Cargar archivo procesado
         contacts = self.excel_processor.load_processed_file(filename)
-        
+
         if not contacts or len(contacts) == 0:
             self.variables_label.setText("⚠️ No se pudieron cargar las columnas del archivo")
             return
-        
+
         # Obtener columnas del primer registro
         self.available_columns = list(contacts[0].keys())
-        
+
         self.variables_label.setText(f"✨ {len(self.available_columns)} variables disponibles - Haz clic para insertar:")
-        
+
         # Limpiar botones anteriores
         while self.variables_layout.count():
             child = self.variables_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
-        
+
         # Crear botones para cada variable
         for column in self.available_columns:
             btn = QPushButton(f"{{{column}}}")
@@ -410,7 +418,7 @@ class CampaignsTab(QWidget):
             """)
             btn.clicked.connect(lambda checked, col=column: self.insert_variable(col))
             self.variables_layout.addWidget(btn)
-    
+
     def insert_variable(self, column_name):
         """Inserta una variable en el editor de plantilla."""
         cursor = self.template_editor.textCursor()
@@ -420,7 +428,11 @@ class CampaignsTab(QWidget):
     def get_selected_profiles(self):
         """Retorna los nombres de perfiles marcados."""
         return [cb.text() for cb in self.profile_checkboxes if cb.isChecked()]
-    
+
+    def sync_delay_bounds(self):
+        """Asegura que el máximo nunca sea menor al mínimo."""
+        self.delay_max_spin.setMinimum(self.delay_min_spin.value())
+
     def refresh_data(self):
         """Actualiza los datos de plantillas, contactos y perfiles."""
         # Plantillas
@@ -428,17 +440,10 @@ class CampaignsTab(QWidget):
         templates = self.templates_manager.get_templates()
         for template in templates:
             self.template_combo.addItem(template['nombre'])
-        
-        # Contactos procesados
-        current_file = self.contacts_combo.currentText()
-        self.contacts_combo.clear()
-        processed_files = self.excel_processor.get_processed_files()
-        self.contacts_combo.addItems(processed_files)
-        
-        # Restaurar selección si existe
-        if current_file and current_file in processed_files:
-            self.contacts_combo.setCurrentText(current_file)
-        
+
+        # Contactos procesados - usar el último automáticamente
+        self.update_contacts_source()
+
         # Perfiles - MOSTRAR TODOS (activos e inactivos)
         # Limpiar contenedor anterior
         for i in reversed(range(self.profiles_container_layout.count())):
@@ -453,24 +458,40 @@ class CampaignsTab(QWidget):
             checkbox.setChecked(profile.get('activo', False))
             self.profile_checkboxes.append(checkbox)
             self.profiles_container_layout.addWidget(checkbox)
-    
+
+    def update_contacts_source(self):
+        """Detecta y muestra el último archivo de contactos procesado."""
+        latest_file = self.excel_processor.get_latest_processed_file()
+        self.current_contacts_file = latest_file
+
+        if latest_file:
+            self.contacts_info_label.setText(
+                f"Usando: <b>{latest_file}</b> (subido desde Perfiles)"
+            )
+            self.load_available_columns(latest_file)
+        else:
+            self.contacts_info_label.setText(
+                "⚠️ No hay archivos procesados. Subí un Excel desde la pestaña Perfiles."
+            )
+            self.load_available_columns(None)
+
     def load_template_content(self, template_name):
         """Carga el contenido de una plantilla en el editor."""
         if not template_name:
             return
-        
+
         template = self.templates_manager.get_template_by_name(template_name)
         if template:
             self.template_editor.setPlainText(template['contenido'])
-    
+
     def save_new_template(self):
         """Guarda el contenido actual como una nueva plantilla."""
         content = self.template_editor.toPlainText().strip()
-        
+
         if not content:
             QMessageBox.warning(self, "Error", "El contenido de la plantilla está vacío")
             return
-        
+
         # Pedir nombre
         from PySide6.QtWidgets import QInputDialog
         name, ok = QInputDialog.getText(
@@ -478,30 +499,30 @@ class CampaignsTab(QWidget):
             "Nueva plantilla",
             "Nombre de la plantilla:"
         )
-        
+
         if ok and name:
             success, message = self.templates_manager.add_template(name, content)
-            
+
             if success:
                 QMessageBox.information(self, "Éxito", message)
                 self.refresh_data()
             else:
                 QMessageBox.warning(self, "Error", message)
-    
+
     def delete_template(self):
         """Elimina la plantilla seleccionada."""
         template_name = self.template_combo.currentText()
-        
+
         if not template_name:
             return
-        
+
         reply = QMessageBox.question(
             self,
             "Confirmar eliminación",
             f"¿Estás seguro de eliminar la plantilla '{template_name}'?",
             QMessageBox.Yes | QMessageBox.No
         )
-        
+
         if reply == QMessageBox.Yes:
             if self.templates_manager.delete_template(template_name):
                 QMessageBox.information(self, "Éxito", "Plantilla eliminada")
@@ -509,7 +530,7 @@ class CampaignsTab(QWidget):
                 self.template_editor.clear()
             else:
                 QMessageBox.warning(self, "Error", "No se pudo eliminar la plantilla")
-    
+
     def create_campaign(self):
         """Crea una nueva campaña."""
         # Validaciones
@@ -517,23 +538,28 @@ class CampaignsTab(QWidget):
         if not campaign_name:
             QMessageBox.warning(self, "Error", "Debe ingresar un nombre para la campaña")
             return
-        
+
         template_content = self.template_editor.toPlainText().strip()
         if not template_content:
             QMessageBox.warning(self, "Error", "Debe seleccionar o crear una plantilla")
             return
-        
-        contacts_file = self.contacts_combo.currentText()
+
+        contacts_file = self.current_contacts_file
         if not contacts_file:
-            QMessageBox.warning(self, "Error", "Debe seleccionar una lista de contactos")
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Debes cargar un Excel desde la pestaña Perfiles para usarlo en la campaña",
+            )
             return
-        
         # Obtener perfiles seleccionados
         selected_profiles = self.get_selected_profiles()
         if not selected_profiles:
             QMessageBox.warning(self, "Error", "Debe seleccionar al menos un perfil")
             return
-        
+
+        delay_min = self.delay_min_spin.value()
+        delay_max = self.delay_max_spin.value()
         # Crear campaña
         campaign_data = {
             'nombre': campaign_name,
@@ -541,11 +567,12 @@ class CampaignsTab(QWidget):
             'template_content': template_content,
             'profiles': selected_profiles,
             'contacts_file': contacts_file,
-            'delay': self.delay_spin.value()
+            'delay_min': delay_min,
+            'delay_max': delay_max
         }
-        
+
         success, message = self.sending_engine.create_campaign(campaign_data)
-        
+
         if success:
             QMessageBox.information(
                 self,
@@ -554,23 +581,26 @@ class CampaignsTab(QWidget):
             )
         else:
             QMessageBox.critical(self, "Error", message)
-    
+
     def send_now(self):
         """Inicia el envío inmediato de una campaña."""
         # Validar que haya una campaña lista
         campaign_name = self.campaign_name_input.text().strip()
         template_content = self.template_editor.toPlainText().strip()
-        contacts_file = self.contacts_combo.currentText()
+        contacts_file = self.current_contacts_file
         selected_profiles = self.get_selected_profiles()
-        
+
         if not all([campaign_name, template_content, contacts_file, selected_profiles]):
             QMessageBox.warning(
                 self,
                 "Campaña incompleta",
-                "Primero debes configurar todos los campos y crear la campaña"
+                "Primero debes configurar todos los campos y crear la campaña",
             )
             return
-        
+
+        delay_min = self.delay_min_spin.value()
+        delay_max = self.delay_max_spin.value()
+
         # Confirmar envío
         reply = QMessageBox.question(
             self,
@@ -578,54 +608,55 @@ class CampaignsTab(QWidget):
             f"¿Iniciar envío de campaña '{campaign_name}'?\n\n"
             f"• Perfiles: {len(selected_profiles)}\n"
             f"• Contactos: {contacts_file}\n"
-            f"• Delay: {self.delay_spin.value()} segundos\n\n"
+            f"• Delay: entre {delay_min} y {delay_max} segundos\n\n"
             "Se abrirán los navegadores automáticamente.",
             QMessageBox.Yes | QMessageBox.No
         )
-        
+
         if reply != QMessageBox.Yes:
             return
-        
+
         # Crear campaña si no existe
         campaign_data = {
             'nombre': campaign_name,
-            'template_name': self.template_combo.currentText() or "Sin plantilla",
+            'template_name': self.template_combo.currentText() or 'Sin plantilla',
             'template_content': template_content,
             'profiles': selected_profiles,
             'contacts_file': contacts_file,
-            'delay': self.delay_spin.value()
+            'delay_min': delay_min,
+            'delay_max': delay_max
         }
-        
+
         success, message = self.sending_engine.create_campaign(campaign_data)
-        
+
         if not success:
             QMessageBox.critical(self, "Error", f"No se pudo crear la campaña: {message}")
             return
-        
+
         # Extraer campaign_id del mensaje
         import re
         match = re.search(r'ID: (\d+_\d+)', message)
         if not match:
             QMessageBox.critical(self, "Error", "No se pudo obtener el ID de la campaña")
             return
-        
+
         campaign_id = match.group(1)
-        
+
         # Deshabilitar botones durante envío
         self.send_now_btn.setEnabled(False)
         self.send_now_btn.setText("⏳ Enviando...")
-        
+
         if self.status_tab:
             self.status_tab.begin_live_campaign(campaign_id, campaign_name)
             if hasattr(self.window(), "tabs"):
                 self.window().tabs.setCurrentWidget(self.status_tab)
-        
+
         # Iniciar thread de envío
         self.sending_thread = SendingThread(campaign_id, self.sending_engine)
         self.sending_thread.progress.connect(self.update_progress)
         self.sending_thread.finished.connect(self.sending_finished)
         self.sending_thread.start()
-    
+
     def update_progress(self, message):
         """Actualiza el log de progreso."""
         if self.status_tab:
