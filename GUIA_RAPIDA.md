@@ -24,12 +24,9 @@ pip install -r requirements.txt
 # Opción tradicional
 python main.py
 
-# Opción con botón EJECUTAR
-python launcher.py
+# Windows (doble clic)
+# Ejecuta el archivo EJECUTAR.bat para abrir la app sin usar la terminal
 ```
-
-Al usar `launcher.py` verás una ventana con el botón **⚡ EJECUTAR** para abrir
-la aplicación sin comandos adicionales.
 
 ---
 
