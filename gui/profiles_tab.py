@@ -54,22 +54,105 @@ class ProfilesTab(QWidget):
 
         # Sección de crear nuevo perfil
         create_group = QGroupBox("Crear perfil nuevo")
-        create_layout = QHBoxLayout(create_group)
+        create_group.setStyleSheet(
+            "QGroupBox {"
+            "  border: 1px solid #1f2d38;"
+            "  border-radius: 12px;"
+            "  padding: 12px;"
+            "  background: #0f1820;"
+            "}"
+            "QGroupBox::title { font-weight: 700; padding: 4px 8px; }"
+        )
+        create_layout = QVBoxLayout(create_group)
         create_layout.setSpacing(10)
 
+        create_hint = QLabel("Poné un nombre claro para ubicar rápido el perfil.")
+        create_hint.setStyleSheet("color: #9fb3c8;")
+        create_layout.addWidget(create_hint)
+
+        form_row = QHBoxLayout()
+        form_row.setSpacing(10)
+
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Nombre del nuevo perfil...")
-        self.name_input.setMinimumHeight(35)
-        
-        self.create_btn = QPushButton("Crear Perfil")
+        self.name_input.setPlaceholderText("Ej: Soporte - Línea 1")
+        self.name_input.setMinimumHeight(38)
+        self.name_input.setStyleSheet(
+            "QLineEdit {"
+            "  border: 1px solid #2b3a48;"
+            "  border-radius: 10px;"
+            "  padding: 6px 10px;"
+            "  background: #0a121a;"
+            "  color: #e5e5e5;"
+            "}"
+            "QLineEdit:focus { border-color: #1f5c7a; }"
+        )
+
+        self.create_btn = QPushButton("Crear perfil")
         self.create_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.create_btn.setMinimumHeight(35)
+        self.create_btn.setMinimumHeight(38)
+        self.create_btn.setStyleSheet(
+            "QPushButton {"
+            "  background-color: #1f5c7a;"
+            "  color: white;"
+            "  border: 2px solid #2f7aa2;"
+            "  border-radius: 10px;"
+            "  padding: 6px 14px;"
+            "  font-weight: 700;"
+            "}"
+            "QPushButton:hover { background-color: #26749b; }"
+        )
         self.create_btn.clicked.connect(self.create_profile)
-        
-        create_layout.addWidget(self.name_input)
-        create_layout.addWidget(self.create_btn)
+
+        form_row.addWidget(self.name_input)
+        form_row.addWidget(self.create_btn)
+        create_layout.addLayout(form_row)
 
         layout.addWidget(create_group)
+
+        # Botón para desplegar perfiles creados
+        self.toggle_profiles_btn = QPushButton("Mostrar perfiles creados")
+        self.toggle_profiles_btn.setCheckable(True)
+        self.toggle_profiles_btn.setChecked(False)
+        self.toggle_profiles_btn.setMinimumHeight(32)
+        self.toggle_profiles_btn.setStyleSheet(
+            "QPushButton {"
+            "  background-color: #12354a;"
+            "  color: white;"
+            "  border: 1px solid #1f5c7a;"
+            "  border-radius: 8px;"
+            "  padding: 4px 10px;"
+            "  font-weight: 600;"
+            "}"
+            "QPushButton:hover { background-color: #1d4f6d; }"
+            "QPushButton:checked { background-color: #1f5c7a; }"
+        )
+        self.toggle_profiles_btn.toggled.connect(self.toggle_profiles_section)
+        layout.addWidget(self.toggle_profiles_btn)
+
+        # Contenedor de perfiles (colapsable)
+        self.profiles_group = QGroupBox("Perfiles creados")
+        self.profiles_group.setStyleSheet(
+            "QGroupBox {"
+            "  font-weight: bold;"
+            "  border: 1px solid #2b3a48;"
+            "  border-radius: 12px;"
+            "  padding: 10px;"
+            "  background: #0f1820;"
+            "}"
+            "QGroupBox::title { subcontrol-position: top left; padding: 6px 8px; }"
+        )
+        profiles_layout = QVBoxLayout(self.profiles_group)
+        profiles_layout.setContentsMargins(10, 10, 10, 10)
+        profiles_layout.setSpacing(10)
+
+        self.profiles_container = QWidget()
+        self.profiles_layout = QVBoxLayout(self.profiles_container)
+        self.profiles_layout.setContentsMargins(0, 0, 0, 0)
+        self.profiles_layout.setSpacing(8)
+
+        profiles_layout.addWidget(self.profiles_container)
+        self.profiles_group.setVisible(False)
+        layout.addWidget(self.profiles_group)
 
         # Bloque rápido para cargar Excel
         excel_group = QGroupBox("Contactos desde Excel")
@@ -93,27 +176,17 @@ class ProfilesTab(QWidget):
         excel_layout.addWidget(self.excel_status_label)
 
         layout.addWidget(excel_group)
-
-        # Contenedor de perfiles
-        profiles_group = QGroupBox("Perfiles creados")
-        profiles_group.setStyleSheet(
-            "QGroupBox { font-weight: bold; }"
-            "QGroupBox::title { subcontrol-position: top left; padding: 6px 8px; }"
-        )
-        profiles_layout = QVBoxLayout(profiles_group)
-        profiles_layout.setContentsMargins(10, 10, 10, 10)
-        profiles_layout.setSpacing(10)
-
-        self.profiles_container = QWidget()
-        self.profiles_layout = QVBoxLayout(self.profiles_container)
-        self.profiles_layout.setContentsMargins(0, 0, 0, 0)
-        self.profiles_layout.setSpacing(8)
-
-        profiles_layout.addWidget(self.profiles_container)
-        layout.addWidget(profiles_group)
         
         layout.addStretch()
         scroll.setWidget(container)
+
+    def toggle_profiles_section(self, checked):
+        """Muestra u oculta el bloque de perfiles creados."""
+        self.profiles_group.setVisible(checked)
+        if checked:
+            self.toggle_profiles_btn.setText("Ocultar perfiles creados")
+        else:
+            self.toggle_profiles_btn.setText("Mostrar perfiles creados")
     
     def create_profile(self):
         """Crea un nuevo perfil."""
