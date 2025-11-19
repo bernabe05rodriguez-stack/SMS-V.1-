@@ -69,6 +69,12 @@ Puedes abrir la app de dos maneras:
   automáticamente `main.py`, ideal para usuarios que prefieren hacer clic en
   lugar de usar la terminal.
 
+- **Windows | Doble clic:**
+
+  Coloca el archivo `EJECUTAR.bat` dentro de la carpeta del programa y haz doble
+  clic sobre él. El script cambia automáticamente al directorio correcto y
+  lanza `launcher.py`, por lo que no necesitas abrir la terminal.
+
 ## 📁 Estructura del Proyecto
 
 ```
