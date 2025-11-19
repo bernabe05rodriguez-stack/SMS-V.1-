@@ -72,8 +72,7 @@ sms_multiperfil_local/
 ├── main.py                      # Punto de entrada de la aplicación
 ├── gui/                         # Interfaz gráfica
 │   ├── main_window.py          # Ventana principal con pestañas
-│   ├── profiles_tab.py         # Pestaña de perfiles
-│   ├── excel_tab.py            # Pestaña de Excel/Contactos
+│   ├── profiles_tab.py         # Pestaña de perfiles (con carga de Excel)
 │   ├── campaigns_tab.py        # Pestaña de campañas (CON ENVÍO)
 │   └── status_tab.py           # Pestaña de estado de envíos
 ├── core/                        # Lógica de negocio
@@ -105,11 +104,11 @@ sms_multiperfil_local/
 
 ### 2. Procesar Excel
 
-1. Ve a la pestaña **"Excel / Contactos"**
-2. Haz clic en **"Subir archivo Excel/CSV"**
+1. Ve a la pestaña **"Perfiles"** y buscá el bloque **"Contactos desde Excel"**
+2. Haz clic en **"Cargar y procesar Excel"**
 3. Selecciona tu archivo con contactos
-4. Selecciona el archivo en la lista de "Archivos subidos"
-5. Haz clic en **"Procesar archivo seleccionado"**
+4. Espera el mensaje de confirmación indicando la cantidad de registros
+5. ¡Listo! El archivo queda disponible automáticamente en la pestaña **Campañas**
 
 #### Formato del Excel
 
