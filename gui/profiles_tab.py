@@ -9,9 +9,8 @@ import shutil
 import subprocess
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLineEdit, QTableWidget, QTableWidgetItem,
-                               QLabel, QMessageBox, QHeaderView, QCheckBox,
-                               QSizePolicy, QScrollArea, QGroupBox,
-                               QFileDialog)
+                               QLabel, QMessageBox, QHeaderView, QSizePolicy,
+                               QScrollArea, QGroupBox, QFileDialog)
 from PySide6.QtCore import Qt
 from core.profiles_manager import ProfilesManager
 from core.excel_processor import ExcelProcessor
@@ -25,6 +24,7 @@ class ProfilesTab(QWidget):
         self.profiles_manager = ProfilesManager()
         self.excel_processor = ExcelProcessor()
         self.last_uploaded_excel = None
+        self.browser_processes = {}
         self.init_ui()
         self.load_profiles()
     
@@ -43,7 +43,7 @@ class ProfilesTab(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
 
         # Título
-        title = QLabel("Perfiles activos y contactos")
+        title = QLabel("Perfiles y contactos")
         title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
 
@@ -97,23 +97,17 @@ class ProfilesTab(QWidget):
 
         # Tabla de perfiles
         self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["Perfil", "Activo", "Acciones"])
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Perfil", "Acciones"])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
         self.table.setMinimumHeight(400)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         layout.addWidget(self.table)
-        
-        # Información
-        info_label = QLabel("💡 Los perfiles activos se usarán en las campañas de envío")
-        info_label.setStyleSheet("color: #888; margin: 10px;")
-        layout.addWidget(info_label)
         
         layout.addStretch()
         scroll.setWidget(container)
@@ -139,28 +133,13 @@ class ProfilesTab(QWidget):
         """Carga los perfiles en la tabla."""
         profiles = self.profiles_manager.get_profiles()
         self.table.setRowCount(len(profiles))
-        
+
         for row, profile in enumerate(profiles):
             # Nombre
             name_item = QTableWidgetItem(profile['nombre'])
             name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(row, 0, name_item)
-            
-            # Checkbox activo
-            checkbox_widget = QWidget()
-            checkbox_layout = QHBoxLayout(checkbox_widget)
-            checkbox_layout.setAlignment(Qt.AlignCenter)
-            checkbox_layout.setContentsMargins(0, 0, 0, 0)
-            
-            checkbox = QCheckBox()
-            checkbox.setChecked(profile.get('activo', True))
-            checkbox.stateChanged.connect(
-                lambda state, name=profile['nombre']: self.toggle_profile_status(name, state)
-            )
-            
-            checkbox_layout.addWidget(checkbox)
-            self.table.setCellWidget(row, 1, checkbox_widget)
-            
+
             # Acciones
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
@@ -174,6 +153,13 @@ class ProfilesTab(QWidget):
             )
             actions_layout.addWidget(open_btn)
 
+            close_btn = QPushButton("Cerrar")
+            close_btn.setMinimumHeight(28)
+            close_btn.clicked.connect(
+                lambda checked, name=profile['nombre']: self.close_browser(name)
+            )
+            actions_layout.addWidget(close_btn)
+
             delete_btn = QPushButton("Eliminar")
             delete_btn.setStyleSheet("background-color: #c0392b; color: white;")
             delete_btn.setMinimumHeight(28)
@@ -182,12 +168,7 @@ class ProfilesTab(QWidget):
             )
             actions_layout.addWidget(delete_btn)
 
-            self.table.setCellWidget(row, 2, actions_widget)
-
-    def toggle_profile_status(self, name, state):
-        """Cambia el estado activo de un perfil."""
-        active = (state == Qt.CheckState.Checked)
-        self.profiles_manager.update_profile_status(name, active)
+            self.table.setCellWidget(row, 1, actions_widget)
 
     def upload_excel_file(self):
         """Sube y procesa un archivo Excel/CSV desde el bloque de perfiles."""
@@ -261,6 +242,18 @@ class ProfilesTab(QWidget):
             )
             return
         
+        existing_process = self.browser_processes.get(profile_name)
+        if existing_process:
+            if existing_process.poll() is None:
+                QMessageBox.information(
+                    self,
+                    "Perfil ya abierto",
+                    f"El perfil '{profile_name}' ya tiene un navegador abierto."
+                )
+                return
+            else:
+                self.browser_processes.pop(profile_name, None)
+
         # Comando completo
         cmd = [
             chrome_exe,
@@ -268,9 +261,10 @@ class ProfilesTab(QWidget):
             '--profile-directory=Default',
             'https://messages.google.com/web'
         ]
-        
+
         try:
-            subprocess.Popen(cmd)
+            process = subprocess.Popen(cmd)
+            self.browser_processes[profile_name] = process
             QMessageBox.information(
                 self,
                 "Navegador abierto",
@@ -278,11 +272,37 @@ class ProfilesTab(QWidget):
                 "Si es la primera vez, deberás iniciar sesión en Google Messages."
             )
         except Exception as e:
+            self.browser_processes.pop(profile_name, None)
             QMessageBox.critical(
                 self,
                 "Error",
                 f"No se pudo abrir Chrome:\n{str(e)}"
             )
+
+    def close_browser(self, profile_name):
+        """Cierra el navegador abierto para un perfil si existe."""
+        process = self.browser_processes.get(profile_name)
+
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+            QMessageBox.information(
+                self,
+                "Navegador cerrado",
+                f"Se cerró el navegador del perfil '{profile_name}'."
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Navegador no encontrado",
+                f"No hay un navegador abierto para el perfil '{profile_name}'."
+            )
+
+        self.browser_processes.pop(profile_name, None)
     
     def delete_profile(self, profile_name):
         """Elimina un perfil."""
