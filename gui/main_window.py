@@ -60,9 +60,9 @@ class MainWindow(QMainWindow):
         """)
         
         # Crear e inicializar pestañas
-        self.profiles_tab = ProfilesTab()
-        self.campaigns_tab = CampaignsTab()
         self.status_tab = StatusTab()
+        self.profiles_tab = ProfilesTab()
+        self.campaigns_tab = CampaignsTab(status_tab=self.status_tab)
 
         # Agregar pestañas al widget con iconos
         self.tabs.addTab(self.profiles_tab, "👤 Perfiles")

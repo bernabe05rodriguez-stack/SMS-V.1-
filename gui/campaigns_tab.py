@@ -6,7 +6,7 @@ Diseño moderno y atractivo.
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QComboBox, QTextEdit, QLineEdit,
-                               QSpinBox, QMessageBox, QListWidget, QGroupBox,
+                               QSpinBox, QMessageBox, QGroupBox,
                                QFormLayout, QCheckBox, QScrollArea)
 from PySide6.QtCore import Qt, QThread, Signal
 from core.templates_manager import TemplatesManager
@@ -36,9 +36,10 @@ class SendingThread(QThread):
 
 class CampaignsTab(QWidget):
     """Pestaña para crear y gestionar campañas de envío."""
-    
-    def __init__(self):
+
+    def __init__(self, status_tab=None):
         super().__init__()
+        self.status_tab = status_tab
         self.templates_manager = TemplatesManager()
         self.profiles_manager = ProfilesManager()
         self.excel_processor = ExcelProcessor()
@@ -287,15 +288,22 @@ class CampaignsTab(QWidget):
             }
         """)
         profiles_layout = QVBoxLayout()
-        
-        profiles_info = QLabel("✓ Selecciona uno o más perfiles (Ctrl+Click para múltiples):")
+
+        profiles_info = QLabel("✓ Marca los perfiles que quieras usar para la campaña:")
         profiles_info.setStyleSheet("color: #95a5a6; margin-bottom: 8px;")
         profiles_layout.addWidget(profiles_info)
-        
-        self.profiles_list = QListWidget()
-        self.profiles_list.setSelectionMode(QListWidget.MultiSelection)
-        self.profiles_list.setMinimumHeight(120)
-        profiles_layout.addWidget(self.profiles_list)
+
+        self.profile_checkboxes = []
+        self.profiles_container = QWidget()
+        self.profiles_container_layout = QVBoxLayout(self.profiles_container)
+        self.profiles_container_layout.setSpacing(6)
+        self.profiles_container_layout.setContentsMargins(4, 4, 4, 4)
+
+        profiles_scroll = QScrollArea()
+        profiles_scroll.setWidgetResizable(True)
+        profiles_scroll.setMaximumHeight(150)
+        profiles_scroll.setWidget(self.profiles_container)
+        profiles_layout.addWidget(profiles_scroll)
         
         profiles_group.setLayout(profiles_layout)
         layout.addWidget(profiles_group)
@@ -341,24 +349,13 @@ class CampaignsTab(QWidget):
         buttons_layout.addWidget(self.send_now_btn)
         
         layout.addLayout(buttons_layout)
-        
-        # Log de progreso
-        log_label = QLabel("📋 Progreso de Envío:")
-        log_label.setStyleSheet("font-weight: 600; font-size: 14px; margin-top: 10px;")
-        layout.addWidget(log_label)
-        
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setMinimumHeight(180)
-        self.log_text.setPlaceholderText("Los mensajes de progreso aparecerán aquí...")
-        self.log_text.setStyleSheet("""
-            QTextEdit {
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 12px;
-                line-height: 1.4;
-            }
-        """)
-        layout.addWidget(self.log_text)
+
+        # Recordatorio de progreso
+        progress_note = QLabel(
+            "📈 El progreso en vivo ahora se ve en la pestaña 'Estado de Envíos'."
+        )
+        progress_note.setStyleSheet("color: #95a5a6; margin-top: 6px;")
+        layout.addWidget(progress_note)
 
         layout.addStretch()
         main_scroll.setWidget(container)
@@ -419,6 +416,10 @@ class CampaignsTab(QWidget):
         cursor = self.template_editor.textCursor()
         cursor.insertText(f"{{{column_name}}}")
         self.template_editor.setFocus()
+
+    def get_selected_profiles(self):
+        """Retorna los nombres de perfiles marcados."""
+        return [cb.text() for cb in self.profile_checkboxes if cb.isChecked()]
     
     def refresh_data(self):
         """Actualiza los datos de plantillas, contactos y perfiles."""
@@ -439,15 +440,19 @@ class CampaignsTab(QWidget):
             self.contacts_combo.setCurrentText(current_file)
         
         # Perfiles - MOSTRAR TODOS (activos e inactivos)
-        self.profiles_list.clear()
+        # Limpiar contenedor anterior
+        for i in reversed(range(self.profiles_container_layout.count())):
+            item = self.profiles_container_layout.takeAt(i)
+            if item and item.widget():
+                item.widget().deleteLater()
+        self.profile_checkboxes.clear()
+
         all_profiles = self.profiles_manager.get_profiles()
         for profile in all_profiles:
-            self.profiles_list.addItem(profile['nombre'])
-            # Pre-seleccionar los activos
-            if profile.get('activo', False):
-                items = self.profiles_list.findItems(profile['nombre'], Qt.MatchExactly)
-                if items:
-                    items[0].setSelected(True)
+            checkbox = QCheckBox(profile['nombre'])
+            checkbox.setChecked(profile.get('activo', False))
+            self.profile_checkboxes.append(checkbox)
+            self.profiles_container_layout.addWidget(checkbox)
     
     def load_template_content(self, template_name):
         """Carga el contenido de una plantilla en el editor."""
@@ -524,7 +529,7 @@ class CampaignsTab(QWidget):
             return
         
         # Obtener perfiles seleccionados
-        selected_profiles = [item.text() for item in self.profiles_list.selectedItems()]
+        selected_profiles = self.get_selected_profiles()
         if not selected_profiles:
             QMessageBox.warning(self, "Error", "Debe seleccionar al menos un perfil")
             return
@@ -547,7 +552,6 @@ class CampaignsTab(QWidget):
                 "Éxito",
                 f"{message}\n\nPuedes hacer clic en 'ENVIAR AHORA' para iniciar el envío."
             )
-            self.log_text.append(f"✅ Campaña '{campaign_name}' creada exitosamente")
         else:
             QMessageBox.critical(self, "Error", message)
     
@@ -557,7 +561,7 @@ class CampaignsTab(QWidget):
         campaign_name = self.campaign_name_input.text().strip()
         template_content = self.template_editor.toPlainText().strip()
         contacts_file = self.contacts_combo.currentText()
-        selected_profiles = [item.text() for item in self.profiles_list.selectedItems()]
+        selected_profiles = self.get_selected_profiles()
         
         if not all([campaign_name, template_content, contacts_file, selected_profiles]):
             QMessageBox.warning(
@@ -611,10 +615,10 @@ class CampaignsTab(QWidget):
         self.send_now_btn.setEnabled(False)
         self.send_now_btn.setText("⏳ Enviando...")
         
-        self.log_text.clear()
-        self.log_text.append(f"🚀 Iniciando envío de campaña: {campaign_name}")
-        self.log_text.append(f"📋 ID: {campaign_id}")
-        self.log_text.append("-" * 50)
+        if self.status_tab:
+            self.status_tab.begin_live_campaign(campaign_id, campaign_name)
+            if hasattr(self.window(), "tabs"):
+                self.window().tabs.setCurrentWidget(self.status_tab)
         
         # Iniciar thread de envío
         self.sending_thread = SendingThread(campaign_id, self.sending_engine)
@@ -624,22 +628,18 @@ class CampaignsTab(QWidget):
     
     def update_progress(self, message):
         """Actualiza el log de progreso."""
-        self.log_text.append(message)
-        # Auto-scroll al final
-        self.log_text.verticalScrollBar().setValue(
-            self.log_text.verticalScrollBar().maximum()
-        )
-    
+        if self.status_tab:
+            self.status_tab.append_progress(message)
+
     def sending_finished(self, success, message):
         """Callback cuando termina el envío."""
         self.send_now_btn.setEnabled(True)
         self.send_now_btn.setText("🚀 ENVIAR AHORA")
-        
+
+        if self.status_tab:
+            self.status_tab.finish_live_campaign(success, message)
+
         if success:
-            self.log_text.append("-" * 50)
-            self.log_text.append(f"✅ {message}")
             QMessageBox.information(self, "Envío completado", message)
         else:
-            self.log_text.append("-" * 50)
-            self.log_text.append(f"❌ {message}")
             QMessageBox.critical(self, "Error en envío", message)

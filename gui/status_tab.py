@@ -6,7 +6,7 @@ Muestra el estado de las campañas y mensajes enviados.
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QTableWidget, QTableWidgetItem,
                                QHeaderView, QMessageBox, QScrollArea,
-                               QSizePolicy)
+                               QSizePolicy, QTextEdit, QGroupBox)
 from PySide6.QtCore import Qt
 from core.sending_engine import SendingEngine
 
@@ -17,6 +17,7 @@ class StatusTab(QWidget):
     def __init__(self):
         super().__init__()
         self.sending_engine = SendingEngine()
+        self.live_campaign_id = None
         self.init_ui()
         self.load_campaigns()
     
@@ -45,7 +46,26 @@ class StatusTab(QWidget):
         refresh_btn.setMaximumWidth(150)
         refresh_btn.clicked.connect(self.load_campaigns)
         layout.addWidget(refresh_btn)
-        
+
+        # Progreso en vivo
+        live_group = QGroupBox("Progreso en vivo")
+        live_layout = QVBoxLayout()
+
+        self.live_status_label = QLabel("Aún no hay envíos activos.")
+        self.live_status_label.setStyleSheet("color: #95a5a6;")
+        live_layout.addWidget(self.live_status_label)
+
+        self.live_log = QTextEdit()
+        self.live_log.setReadOnly(True)
+        self.live_log.setMinimumHeight(160)
+        self.live_log.setPlaceholderText(
+            "Los mensajes de progreso aparecerán aquí cuando inicies un envío."
+        )
+        live_layout.addWidget(self.live_log)
+
+        live_group.setLayout(live_layout)
+        layout.addWidget(live_group)
+
         # Tabla de campañas
         self.table = QTableWidget()
         self.table.setColumnCount(7)
@@ -138,3 +158,30 @@ class StatusTab(QWidget):
             status_item.setFlags(status_item.flags() & ~Qt.ItemIsEditable)
             status_item.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row, 6, status_item)
+
+    def begin_live_campaign(self, campaign_id, campaign_name):
+        """Prepara la vista de progreso para un envío en curso."""
+        self.live_campaign_id = campaign_id
+        self.live_status_label.setText(
+            f"Enviando campaña: {campaign_name} (ID: {campaign_id})"
+        )
+        self.live_log.clear()
+        self.live_log.append("🚀 Iniciando envío de la campaña")
+        self.live_log.append("-" * 40)
+
+    def append_progress(self, message):
+        """Agrega una línea de progreso al panel en vivo."""
+        self.live_log.append(message)
+        self.live_log.verticalScrollBar().setValue(
+            self.live_log.verticalScrollBar().maximum()
+        )
+
+    def finish_live_campaign(self, success, message):
+        """Muestra el resultado final de un envío."""
+        self.live_log.append("-" * 40)
+        final_icon = "✅" if success else "❌"
+        self.live_log.append(f"{final_icon} {message}")
+        status_text = "Completada" if success else "Fallida"
+        self.live_status_label.setText(
+            f"Último envío finalizado ({status_text}) - ID: {self.live_campaign_id}"
+        )
