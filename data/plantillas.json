@@ -1,0 +1,18 @@
+[
+  {
+    "nombre": "Saludo simple",
+    "contenido": "Hola {Nombre}, ¿cómo estás?"
+  },
+  {
+    "nombre": "Recordatorio de pago",
+    "contenido": "Hola {Nombre}, te recordamos que tenés un saldo pendiente de {$ Asig.}. ¡Gracias!"
+  },
+  {
+    "nombre": "Uno",
+    "contenido": "Hola {Razon Social}, ¿cómo estás? paga  {$ Asig.}"
+  },
+  {
+    "nombre": "tresss",
+    "contenido": "Hola {Razon Social}, paga { Nro. Asig.}"
+  }
+]
