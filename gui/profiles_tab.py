@@ -8,8 +8,7 @@ import platform
 import shutil
 import subprocess
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLineEdit, QTableWidget, QTableWidgetItem,
-                               QLabel, QMessageBox, QHeaderView, QSizePolicy,
+                               QLineEdit, QLabel, QMessageBox, QSizePolicy,
                                QScrollArea, QGroupBox, QFileDialog)
 from PySide6.QtCore import Qt
 from core.profiles_manager import ProfilesManager
@@ -95,19 +94,23 @@ class ProfilesTab(QWidget):
 
         layout.addWidget(excel_group)
 
-        # Tabla de perfiles
-        self.table = QTableWidget()
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Perfil", "Acciones"])
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setAlternatingRowColors(True)
-        self.table.setMinimumHeight(400)
-        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Contenedor de perfiles
+        profiles_group = QGroupBox("Perfiles creados")
+        profiles_group.setStyleSheet(
+            "QGroupBox { font-weight: bold; }"
+            "QGroupBox::title { subcontrol-position: top left; padding: 6px 8px; }"
+        )
+        profiles_layout = QVBoxLayout(profiles_group)
+        profiles_layout.setContentsMargins(10, 10, 10, 10)
+        profiles_layout.setSpacing(10)
 
-        layout.addWidget(self.table)
+        self.profiles_container = QWidget()
+        self.profiles_layout = QVBoxLayout(self.profiles_container)
+        self.profiles_layout.setContentsMargins(0, 0, 0, 0)
+        self.profiles_layout.setSpacing(8)
+
+        profiles_layout.addWidget(self.profiles_container)
+        layout.addWidget(profiles_group)
         
         layout.addStretch()
         scroll.setWidget(container)
@@ -132,7 +135,13 @@ class ProfilesTab(QWidget):
     def load_profiles(self):
         """Carga los perfiles en la tabla."""
         profiles = self.profiles_manager.get_profiles()
-        self.table.setRowCount(len(profiles))
+
+        # Limpiar contenedor
+        while self.profiles_layout.count():
+            item = self.profiles_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
         button_style = (
             "QPushButton {"
@@ -176,43 +185,68 @@ class ProfilesTab(QWidget):
             "}"
         )
 
-        for row, profile in enumerate(profiles):
-            # Nombre
-            name_item = QTableWidgetItem(profile['nombre'])
-            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
-            self.table.setItem(row, 0, name_item)
+        if not profiles:
+            empty_label = QLabel(
+                "No hay perfiles creados todavía. Agrega uno para empezar."
+            )
+            empty_label.setStyleSheet("color: #9b9b9b;")
+            empty_label.setAlignment(Qt.AlignCenter)
+            empty_label.setMinimumHeight(80)
+            self.profiles_layout.addWidget(empty_label)
+            return
 
-            # Acciones
-            actions_widget = QWidget()
-            actions_layout = QHBoxLayout(actions_widget)
-            actions_layout.setContentsMargins(0, 0, 0, 0)
-            actions_layout.setSpacing(10)
+        for profile in profiles:
+            card = QGroupBox()
+            card.setStyleSheet(
+                "QGroupBox {"
+                "  border: 1px solid #2b3a48;"
+                "  border-radius: 10px;"
+                "  padding: 10px;"
+                "  background: #0f1820;"
+                "}"
+            )
+
+            card_layout = QHBoxLayout(card)
+            card_layout.setContentsMargins(12, 8, 12, 8)
+            card_layout.setSpacing(12)
+
+            name_label = QLabel(profile['nombre'])
+            name_label.setStyleSheet("font-size: 14px; font-weight: 600;")
+            card_layout.addWidget(name_label, stretch=1)
+
+            buttons_widget = QWidget()
+            buttons_layout = QHBoxLayout(buttons_widget)
+            buttons_layout.setContentsMargins(0, 0, 0, 0)
+            buttons_layout.setSpacing(8)
 
             open_btn = QPushButton("Abrir")
-            open_btn.setMinimumHeight(32)
+            open_btn.setMinimumWidth(70)
             open_btn.setStyleSheet(button_style)
             open_btn.clicked.connect(
                 lambda checked, name=profile['nombre']: self.open_browser(name)
             )
-            actions_layout.addWidget(open_btn)
+            buttons_layout.addWidget(open_btn)
 
             close_btn = QPushButton("Cerrar")
-            close_btn.setMinimumHeight(32)
+            close_btn.setMinimumWidth(70)
             close_btn.setStyleSheet(secondary_style)
             close_btn.clicked.connect(
                 lambda checked, name=profile['nombre']: self.close_browser(name)
             )
-            actions_layout.addWidget(close_btn)
+            buttons_layout.addWidget(close_btn)
 
             delete_btn = QPushButton("Eliminar")
+            delete_btn.setMinimumWidth(70)
             delete_btn.setStyleSheet(danger_style)
-            delete_btn.setMinimumHeight(32)
             delete_btn.clicked.connect(
                 lambda checked, name=profile['nombre']: self.delete_profile(name)
             )
-            actions_layout.addWidget(delete_btn)
+            buttons_layout.addWidget(delete_btn)
 
-            self.table.setCellWidget(row, 1, actions_widget)
+            card_layout.addWidget(buttons_widget)
+            self.profiles_layout.addWidget(card)
+
+        self.profiles_layout.addStretch()
 
     def upload_excel_file(self):
         """Sube y procesa un archivo Excel/CSV desde el bloque de perfiles."""
