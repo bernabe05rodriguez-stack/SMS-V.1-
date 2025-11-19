@@ -97,17 +97,19 @@ class ExcelProcessor:
                 df['$ Hist.']
                 .astype(str)
                 .str.replace('$', '', regex=False)
-                .str.replace(',', '', regex=False)
+                .str.replace('.', '', regex=False)
+                .str.replace(',', '.', regex=False)
                 .str.strip(),
                 errors='coerce'
             ).fillna(0)
-        
+
         if '$ Asig.' in df.columns:
             df['$ Asig.'] = pd.to_numeric(
                 df['$ Asig.']
                 .astype(str)
                 .str.replace('$', '', regex=False)
-                .str.replace(',', '', regex=False)
+                .str.replace('.', '', regex=False)
+                .str.replace(',', '.', regex=False)
                 .str.strip(),
                 errors='coerce'
             ).fillna(0)
