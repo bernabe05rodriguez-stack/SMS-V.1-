@@ -5,7 +5,7 @@ Diseño moderno y atractivo.
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLabel, QTextEdit, QLineEdit,
+                               QLabel, QTextEdit, QLineEdit, QComboBox,
                                QSpinBox, QMessageBox, QGroupBox,
                                QFormLayout, QCheckBox, QScrollArea)
 from PySide6.QtCore import Qt, QThread, Signal
