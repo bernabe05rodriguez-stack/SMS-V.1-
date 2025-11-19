@@ -338,7 +338,7 @@ class SendingEngine:
             
             # Buscar el campo "To" para ingresar el número
             log(f"   📝 Ingresando número de teléfono: {phone}")
-            
+
             to_field_selectors = [
                 "//input[@placeholder='Type a name, phone number, or email']",
                 "//input[@placeholder='Escribe un nombre, número de teléfono o correo electrónico']",
@@ -348,36 +348,38 @@ class SendingEngine:
                 "//input[contains(@placeholder, 'name')]",
                 "//input[contains(@placeholder, 'nombre')]"
             ]
-            
+
             to_field = None
             for selector in to_field_selectors:
                 try:
-                    to_field = wait.until(EC.presence_of_element_located((By.XPATH, selector)))
+                    to_field = wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
                     if to_field:
                         log(f"   ✅ Campo 'To' encontrado")
                         break
-                except:
+                except Exception:
                     continue
-            
+
             if not to_field:
                 log(f"   ❌ No se encontró el campo 'To'")
                 return False
-            
-            # Limpiar y escribir el número
-            to_field.clear()
+
+            # Limpiar y escribir el número asegurando el foco
+            to_field.click()
+            to_field.send_keys(Keys.CONTROL, "a")
+            to_field.send_keys(Keys.BACKSPACE)
             time.sleep(0.5)
             to_field.send_keys(phone)
             time.sleep(2)
-            
+
             log(f"   ⏳ Esperando que aparezca el contacto...")
-            
-            # Presionar Enter para seleccionar el contacto
+
+            # Presionar Enter para seleccionar el contacto y abrir el chat
             to_field.send_keys(Keys.ENTER)
             time.sleep(2)
-            
+
             # Ahora buscar el campo de texto del mensaje
             log(f"   📝 Buscando campo de mensaje...")
-            
+
             text_field_selectors = [
                 "//div[@contenteditable='true' and @role='textbox']",
                 "//div[@contenteditable='true' and contains(@aria-label, 'Text')]",
@@ -385,17 +387,19 @@ class SendingEngine:
                 "//div[@contenteditable='true']",
                 "//textarea[@placeholder='Text message']",
                 "//textarea[@placeholder='Mensaje de texto']",
-                "//mw-message-compose-editor//div[@contenteditable='true']"
+                "//mw-message-compose-editor//div[@contenteditable='true']",
+                "//textarea[@aria-label='Mensaje']",
+                "//textarea[@aria-label='Text message']"
             ]
-            
+
             text_field = None
             for selector in text_field_selectors:
                 try:
-                    text_field = wait.until(EC.presence_of_element_located((By.XPATH, selector)))
+                    text_field = wait.until(EC.visibility_of_element_located((By.XPATH, selector)))
                     if text_field:
                         log(f"   ✅ Campo de mensaje encontrado")
                         break
-                except:
+                except Exception:
                     continue
             
             if not text_field:
