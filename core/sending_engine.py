@@ -9,6 +9,7 @@ import time
 import platform
 import subprocess
 import random
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -205,10 +206,11 @@ class SendingEngine:
                 driver = self.drivers[profile_name]
                 
                 # Obtener teléfono
-                phone = str(contact.get('Telefono_1', contact.get('Telefono', '')))
-                
+                phone_raw = str(contact.get('Telefono_1', contact.get('Telefono', '')))
+                phone = self._normalize_phone(phone_raw)
+
                 if not phone:
-                    log(f"⚠️ [{idx}/{len(contacts)}] Contacto sin teléfono, saltando...")
+                    log(f"⚠️ [{idx}/{len(contacts)}] Contacto sin teléfono válido, saltando...")
                     campaign['failed_messages'] += 1
                     continue
                 
@@ -265,6 +267,21 @@ class SendingEngine:
         except Exception as e:
             self._close_all_browsers()
             return False, f"Error en el envío: {str(e)}"
+
+    def _normalize_phone(self, phone):
+        """Limpia el número de teléfono, dejando solo dígitos y un prefijo + opcional."""
+        if not phone:
+            return ""
+
+        # Mantener un posible "+" al inicio y eliminar cualquier carácter que no sea dígito
+        phone = str(phone).strip()
+        has_plus = phone.startswith("+")
+        digits = re.sub(r"\D", "", phone)
+
+        if not digits:
+            return ""
+
+        return f"+{digits}" if has_plus else digits
     
     def _open_browser_for_profile(self, profile_name):
         """Abre un navegador Chrome con el perfil especificado."""
@@ -413,31 +430,42 @@ class SendingEngine:
                 "//div[contains(@data-placeholder, 'mensaje')]",
             ]
 
-            text_field = None
-            for selector in text_field_selectors:
-                try:
-                    text_field = wait.until(
-                        EC.element_to_be_clickable((By.XPATH, selector))
-                    )
-                    if text_field:
-                        log(f"   ✅ Campo de mensaje encontrado")
-                        break
-                except Exception:
-                    continue
+            def find_text_field():
+                local_text_field = None
+                for selector in text_field_selectors:
+                    try:
+                        local_text_field = wait.until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        if local_text_field:
+                            log(f"   ✅ Campo de mensaje encontrado")
+                            break
+                    except Exception:
+                        continue
+
+                if not local_text_field:
+                    # Fallback: intentar localizar cualquier campo editable visible
+                    try:
+                        editable_candidates = driver.find_elements(
+                            By.CSS_SELECTOR, "div[contenteditable='true']"
+                        )
+                        for candidate in editable_candidates:
+                            if candidate.is_displayed() and candidate.is_enabled():
+                                local_text_field = candidate
+                                log("   ✅ Campo de mensaje encontrado por búsqueda alternativa")
+                                break
+                    except Exception:
+                        pass
+
+                return local_text_field
+
+            text_field = find_text_field()
 
             if not text_field:
-                # Fallback: intentar localizar cualquier campo editable visible
-                try:
-                    editable_candidates = driver.find_elements(
-                        By.CSS_SELECTOR, "div[contenteditable='true']"
-                    )
-                    for candidate in editable_candidates:
-                        if candidate.is_displayed() and candidate.is_enabled():
-                            text_field = candidate
-                            log("   ✅ Campo de mensaje encontrado por búsqueda alternativa")
-                            break
-                except Exception:
-                    pass
+                log("   ⚠️ No se abrió la conversación, reintentando...")
+                to_field.send_keys(Keys.ENTER)
+                time.sleep(2)
+                text_field = find_text_field()
 
             if not text_field:
                 log(f"   ❌ No se encontró el campo de mensaje")
