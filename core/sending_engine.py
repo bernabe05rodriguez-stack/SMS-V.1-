@@ -168,6 +168,7 @@ class SendingEngine:
 
             campaign['total_messages'] = len(contacts)
             campaign['status'] = 'running'
+            campaign['last_sent_number'] = ""
 
             with open(campaign_file, 'w', encoding='utf-8') as f:
                 json.dump(campaign, f, indent=2, ensure_ascii=False)
@@ -259,6 +260,11 @@ class SendingEngine:
                         log("   ❌ Error al enviar mensaje")
                         campaign['failed_messages'] += 1
 
+                    campaign['last_sent_number'] = phone
+
+                    with open(campaign_file, 'w', encoding='utf-8') as f:
+                        json.dump(campaign, f, indent=2, ensure_ascii=False)
+
                     if idx < len(contacts):
                         delay_seconds = random.uniform(delay_min, delay_max)
                         delay_seconds = max(0.2, delay_seconds)
@@ -297,6 +303,11 @@ class SendingEngine:
                 except Exception as e:
                     log(f"   ❌ Error: {str(e)}")
                     campaign['failed_messages'] += 1
+                    campaign['last_sent_number'] = phone
+
+                    with open(campaign_file, 'w', encoding='utf-8') as f:
+                        json.dump(campaign, f, indent=2, ensure_ascii=False)
+
                     profile_index += 1
 
             campaign['status'] = 'completed'
