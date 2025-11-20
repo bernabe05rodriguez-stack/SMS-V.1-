@@ -445,8 +445,7 @@ class SendingEngine:
 
             log(f"   📝 Ingresando número de teléfono: {phone}")
             to_field.click()
-            to_field.fill("")
-            to_field.type(phone, delay=20)
+            to_field.fill(phone)
             to_field.press("Enter")
 
             log("   🔎 Esperando el campo de mensaje...")
@@ -468,8 +467,7 @@ class SendingEngine:
                 return False
 
             message_target.click()
-            message_target.fill("")
-            message_target.type(message, delay=10)
+            message_target.fill(message)
 
             log("   ⏳ Confirmando envío...")
             try:
@@ -495,7 +493,7 @@ class SendingEngine:
                     log("   ❌ No se encontró forma de enviar el mensaje")
                     return False
 
-            page.wait_for_timeout(600)
+            page.wait_for_timeout(250)
 
             return True
 
