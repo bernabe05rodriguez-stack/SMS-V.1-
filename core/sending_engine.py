@@ -349,10 +349,10 @@ class SendingEngine:
         default_timeout_ms = 12000
         page.set_default_timeout(default_timeout_ms)
 
-        startup_timeout_ms = 60000
+        startup_timeout_ms = 3000
         wait_strategies = ["domcontentloaded", "load"]
         log(
-            "   ⏳ Cargando Messages Web con un tiempo extendido de "
+            "   ⏳ Cargando Messages Web con un tiempo de "
             f"{startup_timeout_ms / 1000:.0f}s..."
         )
 
@@ -394,13 +394,54 @@ class SendingEngine:
 
         for selector in new_message_selectors:
             try:
-                page.wait_for_selector(selector, state="visible", timeout=8000)
+                page.wait_for_selector(selector, state="visible", timeout=3000)
                 return
             except PlaywrightTimeoutError:
                 continue
 
         # Si no se encuentra, intentar abrir directamente la URL de nueva conversación
-        page.goto("https://messages.google.com/web/conversations/new", wait_until="domcontentloaded")
+        page.goto(
+            "https://messages.google.com/web/conversations/new",
+            wait_until="domcontentloaded",
+            timeout=3000,
+        )
+
+    def _open_new_conversation(self, page: Page, log: Callable[[str], None]) -> None:
+        """Abre rápidamente el flujo de nuevo mensaje sin recargar toda la app."""
+
+        new_message_selectors = [
+            "button[aria-label='Start chat']",
+            "button[aria-label='Nuevo mensaje']",
+            "button[aria-label*='Nuevo chat']",
+            "button[aria-label*='Start chat']",
+            "div[role='button'][aria-label*='Nuevo']",
+        ]
+
+        try:
+            self._ensure_messages_home(page)
+        except PlaywrightError:
+            log("   ⚠️ No se pudo preparar la pantalla, recargando vista de conversación...")
+            page.goto(
+                "https://messages.google.com/web/conversations/new",
+                wait_until="domcontentloaded",
+                timeout=3000,
+            )
+            return
+
+        for selector in new_message_selectors:
+            try:
+                button = page.locator(selector).first
+                if button.is_visible():
+                    button.click()
+                    return
+            except PlaywrightError:
+                continue
+
+        page.goto(
+            "https://messages.google.com/web/conversations/new",
+            wait_until="domcontentloaded",
+            timeout=3000,
+        )
 
     def _send_with_retry(self, page: Page, phone: str, message: str, log: Callable[[str], None], attempts: int = 2) -> bool:
         """Intenta enviar un mensaje con reintentos rápidos ante fallos puntuales."""
@@ -426,8 +467,8 @@ class SendingEngine:
         """
 
         try:
-            log("   🔍 Navegando a nueva conversación (flujo rápido)...")
-            page.goto("https://messages.google.com/web/conversations/new", wait_until="domcontentloaded")
+            log("   🔍 Abriendo nueva conversación sin recargar toda la página...")
+            self._open_new_conversation(page, log)
 
             to_field_selectors = [
                 "input[aria-label='Type a name, phone number, or email']",
@@ -438,7 +479,7 @@ class SendingEngine:
                 "input[type='text'][aria-label*='teléfono']",
             ]
 
-            to_field = self._wait_first_visible(page, to_field_selectors)
+            to_field = self._wait_first_visible(page, to_field_selectors, timeout=3000)
 
             if not to_field:
                 log("   ❌ No se encontró el campo 'Para' para pegar el número")
@@ -470,7 +511,7 @@ class SendingEngine:
             message_target = None
             for attempt in range(2):
                 message_target = self._wait_first_visible(
-                    page, text_field_selectors, frame=compose_frame
+                    page, text_field_selectors, frame=compose_frame, timeout=3000
                 )
 
                 if message_target:
@@ -484,7 +525,7 @@ class SendingEngine:
                     wait_until="domcontentloaded",
                 )
 
-                to_field = self._wait_first_visible(page, to_field_selectors)
+                to_field = self._wait_first_visible(page, to_field_selectors, timeout=3000)
                 if not to_field:
                     log("   ❌ No se pudo localizar el campo de mensaje")
                     return False
@@ -518,7 +559,11 @@ class SendingEngine:
                 ]
 
                 send_button = self._wait_first_visible(
-                    page, send_button_selectors, state="enabled", frame=compose_frame
+                    page,
+                    send_button_selectors,
+                    state="enabled",
+                    frame=compose_frame,
+                    timeout=2000,
                 )
 
                 if send_button:
@@ -547,7 +592,7 @@ class SendingEngine:
         page: Page,
         selectors,
         state: str = "visible",
-        timeout: int = 12000,
+        timeout: int = 3000,
         frame: Optional[Frame] = None,
     ) -> Optional[object]:
         """
