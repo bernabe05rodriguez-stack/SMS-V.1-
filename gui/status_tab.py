@@ -150,6 +150,7 @@ class StatusTab(QWidget):
                 'created': 'Creada',
                 'running': 'En progreso',
                 'paused': 'Pausada',
+                'cancelled': 'Cancelada',
                 'completed': 'Completada',
                 'failed': 'Fallida'
             }.get(status, status)
