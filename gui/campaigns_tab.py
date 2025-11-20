@@ -537,6 +537,9 @@ class CampaignsTab(QWidget):
         selected_phone_fields = prefs.get("selected_phone_fields") or []
         selected_variables = prefs.get("selected_variables")
 
+        # Asegurar que todos los contactos sean diccionarios válidos
+        contacts = [c for c in contacts if isinstance(c, dict)]
+
         # Filtrar contactos por campos telefónicos elegidos
         if selected_phone_fields:
             contacts = [
