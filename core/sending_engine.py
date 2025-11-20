@@ -319,187 +319,123 @@ class SendingEngine:
             bool: True si se envió exitosamente
         """
         try:
-            log(f"   🔍 Navegando a nueva conversación...")
-            
-            # Ir a la página principal primero
-            driver.get("https://messages.google.com/web/conversations")
-            time.sleep(1.5)
-            
-            # Buscar el botón "Start chat" o "Iniciar chat"
-            wait = WebDriverWait(driver, 10)
-            
-            # Intentar diferentes selectores para el botón de nuevo chat
-            start_chat_selectors = [
-                "//button[@aria-label='Start chat']",
-                "//button[@aria-label='Iniciar chat']",
-                "//a[@href='/web/conversations/new']",
-                "//button[contains(@class, 'start-chat')]",
-                "//mw-fab-button",
-                "//button[contains(., 'Start')]"
-            ]
-            
-            start_chat_btn = None
-            start_chat_locator = None
-            for selector in start_chat_selectors:
-                try:
-                    start_chat_btn = wait.until(
-                        EC.presence_of_element_located((By.XPATH, selector))
-                    )
-                    if start_chat_btn:
-                        start_chat_locator = (By.XPATH, selector)
-                        log(f"   ✅ Botón de nuevo chat encontrado")
-                        break
-                except Exception:
-                    continue
+            log(f"   🔍 Navegando a nueva conversación (flujo rápido)...")
 
-            if start_chat_btn:
-                try:
-                    wait.until(EC.element_to_be_clickable(start_chat_locator)).click()
-                except ElementClickInterceptedException:
-                    log("   ⚠️ Botón bloqueado, reintentando con scroll y clic JS...")
-                    driver.execute_script(
-                        "arguments[0].scrollIntoView({block: 'center', inline: 'center'});",
-                        start_chat_btn,
-                    )
-                    time.sleep(0.5)
-                    driver.execute_script("arguments[0].click();", start_chat_btn)
-                time.sleep(1.2)
-            else:
-                # Si no encuentra el botón, ir directamente a la URL
-                log(f"   ⚠️ Botón no encontrado, usando URL directa...")
-                driver.get("https://messages.google.com/web/conversations/new")
-                time.sleep(1.5)
-            
+            wait = WebDriverWait(driver, 10)
+
+            # Ir directo al formulario de nueva conversación para evitar estados previos
+            driver.get("https://messages.google.com/web/conversations/new")
+            time.sleep(1)
+
             # Buscar el campo "To" para ingresar el número
             log(f"   📝 Ingresando número de teléfono: {phone}")
 
             to_field_selectors = [
+                "//input[@aria-label='Type a name, phone number, or email']",
+                "//input[@aria-label='Escribe un nombre, número de teléfono o correo electrónico']",
                 "//input[@placeholder='Type a name, phone number, or email']",
                 "//input[@placeholder='Escribe un nombre, número de teléfono o correo electrónico']",
-                "//input[@type='text' and contains(@class, 'input')]",
-                "//input[@aria-label='Type a name, phone number, or email']",
                 "//mw-text-input//input",
-                "//input[contains(@placeholder, 'name')]",
-                "//input[contains(@placeholder, 'nombre')]"
+                "//input[contains(@class, 'input') and @type='text']",
             ]
 
             to_field = None
             for selector in to_field_selectors:
                 try:
-                    to_field = wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
+                    to_field = wait.until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
                     if to_field:
-                        log(f"   ✅ Campo 'To' encontrado")
+                        log("   ✅ Campo 'Para' ubicado")
                         break
                 except Exception:
                     continue
 
             if not to_field:
-                log(f"   ❌ No se encontró el campo 'To'")
+                log("   ❌ No se encontró el campo 'Para' para pegar el número")
                 return False
 
-            # Paso 3: pegar inmediatamente el número tal como indican las instrucciones
-            log("   📋 Pegando número directamente en el campo activo")
-            active_target = driver.switch_to.active_element
+            # Pegar número de inmediato y confirmar
             try:
-                active_target.send_keys(phone)
-            except Exception:
-                log("   ⚠️ No se pudo pegar en el campo activo, intentando con el campo 'To'")
                 to_field.click()
-                to_field.send_keys(phone)
-
-            # Paso 4: seleccionar el contacto con Enter
-            try:
-                driver.switch_to.active_element.send_keys(Keys.ENTER)
+                to_field.clear()
             except Exception:
-                to_field.send_keys(Keys.ENTER)
+                pass
 
-            # Paso 5: esperar 2 segundos antes de pegar el mensaje
-            time.sleep(2)
+            to_field.send_keys(phone)
+            driver.switch_to.active_element.send_keys(Keys.ENTER)
 
-            # Paso 5: pegar el mensaje sin mover el foco manualmente
-            log(f"   ✍️ Pegando mensaje en el campo actual")
-            message_target = driver.switch_to.active_element
-            try:
-                message_target.send_keys(message)
-            except Exception:
-                # Si falla, buscar el campo de texto como respaldo
-                log("   ⚠️ No se pudo pegar en el campo activo, buscando campo de mensaje...")
-                text_field_selectors = [
-                    "//div[@contenteditable='true' and @role='textbox']",
-                    "//div[@contenteditable='true' and contains(@aria-label, 'Text')]",
-                    "//div[@contenteditable='true' and contains(@aria-label, 'Mensaje')]",
-                    "//div[@contenteditable='true']",
-                    "//textarea[@placeholder='Text message']",
-                    "//textarea[@placeholder='Mensaje de texto']",
-                    "//mw-message-compose-editor//div[@contenteditable='true']",
-                    "//textarea[@aria-label='Mensaje']",
-                    "//textarea[@aria-label='Text message']",
-                    "//div[@aria-label='Escribe un mensaje']",
-                    "//div[@aria-label='Message']",
-                    "//div[@role='textbox' and contains(@aria-label, 'message')]",
-                    "//div[contains(@data-placeholder, 'mensaje')]",
-                ]
+            # Esperar a que aparezca el compositor de mensajes
+            log("   🔎 Esperando el campo de mensaje...")
+            text_field_selectors = [
+                "//div[@contenteditable='true' and @role='textbox']",
+                "//div[@contenteditable='true' and contains(@aria-label, 'Text')]",
+                "//div[@contenteditable='true' and contains(@aria-label, 'Mensaje')]",
+                "//div[@contenteditable='true']",
+                "//div[@aria-label='Escribe un mensaje']",
+                "//div[@aria-label='Message']",
+                "//textarea[@aria-label='Text message']",
+                "//textarea[@aria-label='Mensaje de texto']",
+                "//mw-message-compose-editor//div[@contenteditable='true']",
+            ]
 
-                message_target = None
-                for selector in text_field_selectors:
-                    try:
-                        message_target = wait.until(
-                            EC.element_to_be_clickable((By.XPATH, selector))
-                        )
-                        if message_target:
-                            log("   ✅ Campo de mensaje encontrado como respaldo")
-                            break
-                    except Exception:
-                        continue
-
-                if not message_target:
-                    log("   ❌ No se pudo localizar un campo de mensaje para pegar el texto")
-                    return False
-
+            message_target = None
+            for selector in text_field_selectors:
                 try:
-                    message_target.click()
+                    message_target = wait.until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    if message_target:
+                        log("   ✅ Campo de mensaje listo")
+                        break
                 except Exception:
-                    pass
-                message_target.send_keys(message)
+                    continue
 
-            # Paso 6: esperar 2 segundos y enviar con Enter
-            log("   ⏳ Esperando 2 segundos antes de enviar...")
-            time.sleep(2)
+            if not message_target:
+                log("   ❌ No se pudo localizar el campo de mensaje")
+                return False
+
+            # Pegar mensaje y enviar
+            try:
+                message_target.click()
+            except Exception:
+                pass
+            message_target.send_keys(message)
+
+            log("   ⏳ Confirmando envío...")
             try:
                 driver.switch_to.active_element.send_keys(Keys.ENTER)
-                log("   ✅ Enter enviado para mandar el mensaje")
+                log("   ✅ Mensaje enviado con Enter")
             except Exception:
-                # Fallback: intentar localizar botón de enviar
-                log("   ⚠️ No se pudo usar Enter, buscando botón de enviar...")
+                log("   ⚠️ No se pudo usar Enter, probando botón 'Enviar'")
                 send_button_selectors = [
                     "//button[@aria-label='Send message']",
                     "//button[@aria-label='Enviar mensaje']",
                     "//button[contains(@aria-label, 'Send')]",
                     "//button[contains(@aria-label, 'Enviar')]",
-                    "//button[contains(@class, 'send')]",
-                    "//mw-send-button//button"
+                    "//mw-send-button//button",
                 ]
 
                 send_button = None
                 for selector in send_button_selectors:
                     try:
-                        send_button = driver.find_element(By.XPATH, selector)
-                        if send_button and send_button.is_enabled():
-                            log(f"   ✅ Botón de enviar encontrado")
+                        send_button = wait.until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        if send_button:
                             break
                     except Exception:
                         continue
 
                 if send_button:
                     send_button.click()
-                    log(f"   ✅ Clic en botón de enviar")
+                    log("   ✅ Mensaje enviado con botón")
                 else:
-                    log(f"   ❌ No se encontró método para enviar el mensaje")
+                    log("   ❌ No se encontró forma de enviar el mensaje")
                     return False
 
-            # Esperar confirmación
-            time.sleep(3)
-            
+            time.sleep(1.5)
+
             return True
             
         except TimeoutException:
