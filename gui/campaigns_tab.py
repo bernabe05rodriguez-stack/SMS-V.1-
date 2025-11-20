@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QSpinBox, QMessageBox, QGroupBox,
                                QFormLayout, QCheckBox, QScrollArea)
 from PySide6.QtCore import Qt, QThread, Signal
+import threading
 from core.templates_manager import TemplatesManager
 from core.profiles_manager import ProfilesManager
 from core.excel_processor import ExcelProcessor
@@ -26,14 +27,33 @@ class SendingThread(QThread):
         super().__init__()
         self.campaign_id = campaign_id
         self.sending_engine = sending_engine
+        self.stop_event = threading.Event()
+        self.pause_event = threading.Event()
 
     def run(self):
         """Ejecuta el envío de la campaña."""
         try:
-            success, message = self.sending_engine.start_campaign(self.campaign_id, self.progress)
+            success, message = self.sending_engine.start_campaign(
+                self.campaign_id,
+                self.progress,
+                stop_event=self.stop_event,
+                pause_event=self.pause_event
+            )
             self.finished.emit(success, message)
         except Exception as e:
             self.finished.emit(False, f"Error en el envío: {str(e)}")
+
+    def pause(self):
+        """Pausa el envío."""
+        self.pause_event.set()
+
+    def resume(self):
+        """Reanuda el envío pausado."""
+        self.pause_event.clear()
+
+    def cancel(self):
+        """Cancela el envío en curso."""
+        self.stop_event.set()
 
 
 class CampaignsTab(QWidget):
@@ -396,24 +416,6 @@ class CampaignsTab(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(12)
 
-        # Botón crear campaña
-        create_campaign_btn = QPushButton("💾 Crear Campaña")
-        create_campaign_btn.setMinimumHeight(55)
-        create_campaign_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #3498db, stop:1 #2980b9);
-                font-size: 15px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #5dade2, stop:1 #3498db);
-            }
-        """)
-        create_campaign_btn.clicked.connect(self.create_campaign)
-        buttons_layout.addWidget(create_campaign_btn)
-
         # Botón enviar ahora
         self.send_now_btn = QPushButton("🚀 ENVIAR AHORA")
         self.send_now_btn.setMinimumHeight(55)
@@ -431,6 +433,44 @@ class CampaignsTab(QWidget):
         """)
         self.send_now_btn.clicked.connect(self.send_now)
         buttons_layout.addWidget(self.send_now_btn)
+
+        # Botón pausar/reanudar
+        self.pause_resume_btn = QPushButton("⏸️ Pausar")
+        self.pause_resume_btn.setMinimumHeight(55)
+        self.pause_resume_btn.setEnabled(False)
+        self.pause_resume_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #f1c40f, stop:1 #d4ac0d);
+                font-size: 15px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #f4d03f, stop:1 #f1c40f);
+            }
+        """)
+        self.pause_resume_btn.clicked.connect(self.toggle_pause)
+        buttons_layout.addWidget(self.pause_resume_btn)
+
+        # Botón cancelar
+        self.cancel_btn = QPushButton("🛑 Cancelar")
+        self.cancel_btn.setMinimumHeight(55)
+        self.cancel_btn.setEnabled(False)
+        self.cancel_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #e74c3c, stop:1 #c0392b);
+                font-size: 15px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ec7063, stop:1 #e74c3c);
+            }
+        """)
+        self.cancel_btn.clicked.connect(self.cancel_sending)
+        buttons_layout.addWidget(self.cancel_btn)
 
         layout.addLayout(buttons_layout)
 
@@ -638,9 +678,9 @@ class CampaignsTab(QWidget):
             else:
                 QMessageBox.warning(self, "Error", "No se pudo eliminar la plantilla")
 
-    def create_campaign(self):
-        """Crea una nueva campaña."""
-        # Validaciones
+    def send_now(self):
+        """Inicia el envío inmediato de una campaña."""
+        # Validar que haya una campaña lista
         campaign_name = self.campaign_name_input.text().strip()
         if not campaign_name:
             QMessageBox.warning(self, "Error", "Debe ingresar un nombre para la campaña")
@@ -659,50 +699,10 @@ class CampaignsTab(QWidget):
                 "Debes cargar un Excel desde la pestaña Perfiles para usarlo en la campaña",
             )
             return
-        # Obtener perfiles seleccionados
+
         selected_profiles = self.get_selected_profiles()
         if not selected_profiles:
             QMessageBox.warning(self, "Error", "Debe seleccionar al menos un perfil")
-            return
-
-        delay_min = self.delay_min_spin.value()
-        delay_max = self.delay_max_spin.value()
-        # Crear campaña
-        campaign_data = {
-            'nombre': campaign_name,
-            'template_name': self.template_combo.currentText(),
-            'template_content': template_content,
-            'profiles': selected_profiles,
-            'contacts_file': contacts_file,
-            'delay_min': delay_min,
-            'delay_max': delay_max
-        }
-
-        success, message = self.sending_engine.create_campaign(campaign_data)
-
-        if success:
-            QMessageBox.information(
-                self,
-                "Éxito",
-                f"{message}\n\nPuedes hacer clic en 'ENVIAR AHORA' para iniciar el envío."
-            )
-        else:
-            QMessageBox.critical(self, "Error", message)
-
-    def send_now(self):
-        """Inicia el envío inmediato de una campaña."""
-        # Validar que haya una campaña lista
-        campaign_name = self.campaign_name_input.text().strip()
-        template_content = self.template_editor.toPlainText().strip()
-        contacts_file = self.current_contacts_file
-        selected_profiles = self.get_selected_profiles()
-
-        if not all([campaign_name, template_content, contacts_file, selected_profiles]):
-            QMessageBox.warning(
-                self,
-                "Campaña incompleta",
-                "Primero debes configurar todos los campos y crear la campaña",
-            )
             return
 
         delay_min = self.delay_min_spin.value()
@@ -762,7 +762,40 @@ class CampaignsTab(QWidget):
         self.sending_thread = SendingThread(campaign_id, self.sending_engine)
         self.sending_thread.progress.connect(self.update_progress)
         self.sending_thread.finished.connect(self.sending_finished)
+        self.pause_resume_btn.setEnabled(True)
+        self.cancel_btn.setEnabled(True)
+        self.pause_resume_btn.setText("⏸️ Pausar")
         self.sending_thread.start()
+
+    def toggle_pause(self):
+        """Alterna entre pausar y reanudar el envío."""
+        if not self.sending_thread:
+            return
+
+        if not self.pause_resume_btn.isEnabled():
+            return
+
+        if self.sending_thread.pause_event.is_set():
+            self.sending_thread.resume()
+            self.pause_resume_btn.setText("⏸️ Pausar")
+            if self.status_tab:
+                self.status_tab.append_progress("▶️ Reanudando campaña")
+        else:
+            self.sending_thread.pause()
+            self.pause_resume_btn.setText("▶️ Reanudar")
+            if self.status_tab:
+                self.status_tab.append_progress("⏸️ Campaña en pausa")
+
+    def cancel_sending(self):
+        """Cancela el envío en curso."""
+        if not self.sending_thread:
+            return
+
+        self.cancel_btn.setEnabled(False)
+        self.pause_resume_btn.setEnabled(False)
+        self.sending_thread.cancel()
+        if self.status_tab:
+            self.status_tab.append_progress("🛑 Cancelando campaña...")
 
     def update_progress(self, message):
         """Actualiza el log de progreso."""
@@ -773,6 +806,10 @@ class CampaignsTab(QWidget):
         """Callback cuando termina el envío."""
         self.send_now_btn.setEnabled(True)
         self.send_now_btn.setText("🚀 ENVIAR AHORA")
+        self.pause_resume_btn.setEnabled(False)
+        self.pause_resume_btn.setText("⏸️ Pausar")
+        self.cancel_btn.setEnabled(False)
+        self.sending_thread = None
 
         if self.status_tab:
             self.status_tab.finish_live_campaign(success, message)

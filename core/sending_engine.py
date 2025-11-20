@@ -9,6 +9,7 @@ import random
 import re
 import subprocess
 import sys
+import time
 from time import monotonic
 from datetime import datetime
 from pathlib import Path
@@ -104,13 +105,15 @@ class SendingEngine:
 
         return campaigns
 
-    def start_campaign(self, campaign_id, progress_callback=None):
+    def start_campaign(self, campaign_id, progress_callback=None, stop_event=None, pause_event=None):
         """
         Inicia el envío de una campaña.
 
         Args:
             campaign_id: ID de la campaña a iniciar
             progress_callback: Función callback para reportar progreso
+            stop_event: Event para cancelar el envío
+            pause_event: Event para pausar/reanudar el envío
 
         Returns:
             tuple: (success, message)
@@ -141,6 +144,10 @@ class SendingEngine:
                 return False, "No se pudieron cargar los contactos"
 
             campaign['total_messages'] = len(contacts)
+            campaign['status'] = 'running'
+
+            with open(campaign_file, 'w', encoding='utf-8') as f:
+                json.dump(campaign, f, indent=2, ensure_ascii=False)
 
             log(f"📊 Total de contactos: {len(contacts)}")
             log(f"👥 Perfiles a usar: {', '.join(campaign['profiles'])}")
@@ -178,7 +185,31 @@ class SendingEngine:
             from core.templates_manager import TemplatesManager
             templates_mgr = TemplatesManager()
 
+            paused_logged = False
+
             for idx, contact in enumerate(contacts, 1):
+                if stop_event and stop_event.is_set():
+                    campaign['status'] = 'cancelled'
+                    with open(campaign_file, 'w', encoding='utf-8') as f:
+                        json.dump(campaign, f, indent=2, ensure_ascii=False)
+                    self._close_all_browsers()
+                    return False, "Campaña cancelada por el usuario"
+
+                if pause_event and pause_event.is_set():
+                    if not paused_logged:
+                        log("⏸️ Campaña en pausa")
+                        paused_logged = True
+                    while pause_event.is_set():
+                        if stop_event and stop_event.is_set():
+                            campaign['status'] = 'cancelled'
+                            with open(campaign_file, 'w', encoding='utf-8') as f:
+                                json.dump(campaign, f, indent=2, ensure_ascii=False)
+                            self._close_all_browsers()
+                            return False, "Campaña cancelada por el usuario"
+                        time.sleep(0.3)
+                    log("▶️ Reanudando campaña")
+                    paused_logged = False
+
                 profile_name = profile_names[profile_index % len(profile_names)]
                 page: Page = self.sessions[profile_name]["page"]
 
@@ -209,7 +240,34 @@ class SendingEngine:
                         delay_seconds = random.uniform(delay_min, delay_max)
                         delay_seconds = max(0.5, delay_seconds)
                         log(f"   ⏱️ Esperando {delay_seconds:.1f} segundos...")
-                        page.wait_for_timeout(delay_seconds * 1000)
+
+                        waited = 0.0
+                        while waited < delay_seconds:
+                            if stop_event and stop_event.is_set():
+                                campaign['status'] = 'cancelled'
+                                with open(campaign_file, 'w', encoding='utf-8') as f:
+                                    json.dump(campaign, f, indent=2, ensure_ascii=False)
+                                self._close_all_browsers()
+                                return False, "Campaña cancelada por el usuario"
+
+                            if pause_event and pause_event.is_set():
+                                if not paused_logged:
+                                    log("⏸️ Campaña en pausa")
+                                    paused_logged = True
+                                while pause_event.is_set():
+                                    if stop_event and stop_event.is_set():
+                                        campaign['status'] = 'cancelled'
+                                        with open(campaign_file, 'w', encoding='utf-8') as f:
+                                            json.dump(campaign, f, indent=2, ensure_ascii=False)
+                                        self._close_all_browsers()
+                                        return False, "Campaña cancelada por el usuario"
+                                    time.sleep(0.3)
+                                log("▶️ Reanudando campaña")
+                                paused_logged = False
+
+                            chunk = min(0.5, delay_seconds - waited)
+                            page.wait_for_timeout(chunk * 1000)
+                            waited += chunk
 
                     profile_index += 1
 
