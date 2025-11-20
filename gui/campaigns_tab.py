@@ -665,6 +665,8 @@ class CampaignsTab(QWidget):
             self.template_combo.clear()
             templates = self.templates_manager.get_templates() or []
             for template in templates:
+                if not isinstance(template, dict):
+                    continue
                 self.template_combo.addItem(template.get('nombre', ''))
 
             # Contactos procesados - usar el último automáticamente
@@ -680,6 +682,8 @@ class CampaignsTab(QWidget):
 
             all_profiles = self.profiles_manager.get_profiles() or []
             for profile in all_profiles:
+                if not isinstance(profile, dict):
+                    continue
                 checkbox = QCheckBox(profile.get('nombre', ''))
                 checkbox.setChecked(profile.get('activo', False))
                 self.profile_checkboxes.append(checkbox)
