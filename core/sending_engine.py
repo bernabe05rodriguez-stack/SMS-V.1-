@@ -448,6 +448,8 @@ class SendingEngine:
             to_field.fill(phone)
             to_field.press("Enter")
 
+            self._confirm_recipient_selected(page, log)
+
             log("   🔎 Esperando el campo de mensaje...")
             text_field_selectors = [
                 "div[contenteditable='true'][role='textbox']",
@@ -530,6 +532,50 @@ class SendingEngine:
                 continue
 
         return None
+
+    def _confirm_recipient_selected(self, page: Page, log: Callable[[str], None]) -> bool:
+        """Intenta asegurar que el número pegado quede seleccionado."""
+
+        chip_selectors = [
+            "div[role='list'] mw-contact-chips",
+            "div[role='listitem'][data-view-type='chips']",
+            "div[aria-label*='Destinatario'] mw-contact-chip",
+            "div[aria-label*='Recipient'] mw-contact-chip",
+        ]
+
+        for selector in chip_selectors:
+            try:
+                page.locator(selector).wait_for(state="visible", timeout=1200)
+                log("   ✅ Número de destinatario listo")
+                return True
+            except PlaywrightTimeoutError:
+                continue
+
+        suggestion_selectors = [
+            "ul[role='listbox'] li[role='option']",
+            "div[role='listbox'] div[role='option']",
+            "div[role='option'][data-entityid]",
+        ]
+
+        for selector in suggestion_selectors:
+            options = page.locator(selector)
+            try:
+                options.first.wait_for(state="visible", timeout=1200)
+                options.first.click()
+                log("   ✅ Seleccionando número desde sugerencias")
+                return True
+            except PlaywrightTimeoutError:
+                continue
+            except PlaywrightError:
+                continue
+
+        try:
+            page.keyboard.press("Enter")
+            log("   ↩️ Confirmando número con Enter adicional")
+        except PlaywrightError:
+            return False
+
+        return False
 
     def _close_all_browsers(self):
         """Cierra todos los contextos de navegador abiertos y detiene Playwright."""
