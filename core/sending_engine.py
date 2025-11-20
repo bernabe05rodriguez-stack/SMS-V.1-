@@ -179,7 +179,7 @@ class SendingEngine:
             if not profile_names:
                 return False, "No hay perfiles disponibles"
 
-            delay_min = max(1, campaign.get('delay_min', 1))
+            delay_min = max(0, campaign.get('delay_min', 0.2))
             delay_max = max(delay_min, campaign.get('delay_max', delay_min))
 
             from core.templates_manager import TemplatesManager
@@ -206,7 +206,7 @@ class SendingEngine:
                                 json.dump(campaign, f, indent=2, ensure_ascii=False)
                             self._close_all_browsers()
                             return False, "Campaña cancelada por el usuario"
-                        time.sleep(0.3)
+                        time.sleep(0.1)
                     log("▶️ Reanudando campaña")
                     paused_logged = False
 
@@ -238,7 +238,7 @@ class SendingEngine:
 
                     if idx < len(contacts):
                         delay_seconds = random.uniform(delay_min, delay_max)
-                        delay_seconds = max(0.5, delay_seconds)
+                        delay_seconds = max(0.2, delay_seconds)
                         log(f"   ⏱️ Esperando {delay_seconds:.1f} segundos...")
 
                         waited = 0.0
@@ -261,11 +261,11 @@ class SendingEngine:
                                             json.dump(campaign, f, indent=2, ensure_ascii=False)
                                         self._close_all_browsers()
                                         return False, "Campaña cancelada por el usuario"
-                                    time.sleep(0.3)
+                                    time.sleep(0.1)
                                 log("▶️ Reanudando campaña")
                                 paused_logged = False
 
-                            chunk = min(0.5, delay_seconds - waited)
+                            chunk = min(0.25, delay_seconds - waited)
                             page.wait_for_timeout(chunk * 1000)
                             waited += chunk
 
@@ -633,7 +633,7 @@ class SendingEngine:
                     log("   ❌ No se encontró forma de enviar el mensaje")
                     return False
 
-            page.wait_for_timeout(250)
+            page.wait_for_timeout(150)
 
             return True
 
