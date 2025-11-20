@@ -55,6 +55,18 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
+Si el comando anterior no está disponible en tu PATH, usa la alternativa:
+
+```bash
+python -m playwright install chromium
+```
+
+Si recibes errores, asegúrate de tener instalado Playwright previamente:
+
+```bash
+pip install playwright
+```
+
 5. **Ejecutar la aplicación**
 
 Puedes abrir la app de dos maneras:

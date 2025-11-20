@@ -8,6 +8,7 @@ import os
 import random
 import re
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, Optional
@@ -268,9 +269,10 @@ class SendingEngine:
         """Descarga los binarios de Playwright cuando faltan."""
 
         log("⚠️ No se encontró el navegador de Playwright. Descargando Chromium...")
+        install_cmd = ["playwright", "install", "chromium"]
         try:
             result = subprocess.run(
-                ["playwright", "install", "chromium"],
+                install_cmd,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -278,6 +280,27 @@ class SendingEngine:
             if result.stdout:
                 log(result.stdout.strip())
             log("✅ Descarga de Chromium completada")
+        except FileNotFoundError:
+            fallback_cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
+            log("⚠️ El comando 'playwright' no está en el PATH. Intentando con Python...")
+            try:
+                result = subprocess.run(
+                    fallback_cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                if result.stdout:
+                    log(result.stdout.strip())
+                log("✅ Descarga de Chromium completada")
+            except subprocess.CalledProcessError as e:
+                if e.stdout:
+                    log(e.stdout.strip())
+                if e.stderr:
+                    log(e.stderr.strip())
+                log("❌ No se pudo descargar Chromium con Playwright.")
+                log("   Asegúrate de instalar Playwright: pip install playwright")
+                raise RuntimeError("No se pudo descargar Chromium con Playwright") from e
         except subprocess.CalledProcessError as e:
             if e.stdout:
                 log(e.stdout.strip())
