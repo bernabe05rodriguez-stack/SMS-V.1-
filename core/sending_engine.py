@@ -16,6 +16,7 @@ from typing import Callable, Dict, Optional
 from playwright.sync_api import (
     BrowserContext,
     Error as PlaywrightError,
+    Frame,
     Page,
     TimeoutError as PlaywrightTimeoutError,
     sync_playwright,
@@ -460,9 +461,39 @@ class SendingEngine:
                 "textarea[aria-label='Text message']",
                 "textarea[aria-label='Mensaje de texto']",
                 "mw-message-compose-editor div[contenteditable='true']",
+                "div[aria-label*='mensaje'][contenteditable='true']",
+                "textarea[aria-label*='mensaje']",
             ]
 
-            message_target = self._wait_first_visible(page, text_field_selectors)
+            compose_frame = self._find_messages_frame(page, log)
+
+            message_target = None
+            for attempt in range(2):
+                message_target = self._wait_first_visible(
+                    page, text_field_selectors, frame=compose_frame
+                )
+
+                if message_target:
+                    break
+
+                log(
+                    "   🔄 No se encontró el campo de mensaje; recargando conversación para reintentar..."
+                )
+                page.goto(
+                    "https://messages.google.com/web/conversations/new",
+                    wait_until="domcontentloaded",
+                )
+
+                to_field = self._wait_first_visible(page, to_field_selectors)
+                if not to_field:
+                    log("   ❌ No se pudo localizar el campo de mensaje")
+                    return False
+
+                to_field.click()
+                to_field.fill(phone)
+                to_field.press("Enter")
+                self._confirm_recipient_selected(page, log)
+                compose_frame = self._find_messages_frame(page, log)
 
             if not message_target:
                 log("   ❌ No se pudo localizar el campo de mensaje")
@@ -486,7 +517,9 @@ class SendingEngine:
                     "mw-send-button button",
                 ]
 
-                send_button = self._wait_first_visible(page, send_button_selectors, state="enabled")
+                send_button = self._wait_first_visible(
+                    page, send_button_selectors, state="enabled", frame=compose_frame
+                )
 
                 if send_button:
                     send_button.click()
@@ -515,6 +548,7 @@ class SendingEngine:
         selectors,
         state: str = "visible",
         timeout: int = 12000,
+        frame: Optional[Frame] = None,
     ) -> Optional[object]:
         """
         Devuelve el primer locator disponible entre varios selectores.
@@ -523,8 +557,10 @@ class SendingEngine:
         pequeños ajustes en atributos de accesibilidad o idioma.
         """
 
+        context = frame if frame else page
+
         for selector in selectors:
-            locator = page.locator(selector)
+            locator = context.locator(selector)
             try:
                 locator.wait_for(state=state, timeout=timeout)
                 return locator
@@ -576,6 +612,37 @@ class SendingEngine:
             return False
 
         return False
+
+    def _find_messages_frame(
+        self, page: Page, log: Callable[[str], None]
+    ) -> Optional[Frame]:
+        """Localiza el iframe de composición si existe."""
+
+        iframe_selectors = [
+            "iframe[title*='Messages']",
+            "iframe[title*='Mensajes']",
+            "iframe[src*='messages.google.com/web']",
+        ]
+
+        for selector in iframe_selectors:
+            handles = page.locator(selector).element_handles()
+            for handle in handles:
+                try:
+                    frame = handle.content_frame()
+                    if frame:
+                        log("   🧭 Usando iframe de composición detectado")
+                        return frame
+                except PlaywrightError:
+                    continue
+
+        for frame in page.frames:
+            if (
+                frame.url and "messages.google.com/web" in frame.url
+            ) or (frame.name and "Messages" in frame.name):
+                log("   🧭 Usando frame relacionado con Messages")
+                return frame
+
+        return None
 
     def _close_all_browsers(self):
         """Cierra todos los contextos de navegador abiertos y detiene Playwright."""
