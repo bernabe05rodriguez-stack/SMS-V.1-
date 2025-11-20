@@ -144,7 +144,7 @@ class SendingEngine:
 
             # Iniciar Playwright una sola vez
             if not self.playwright:
-                self.playwright = sync_playwright().start()
+                self._start_playwright(log)
 
             log("🌐 Abriendo navegadores persistentes por perfil...")
 
@@ -249,6 +249,19 @@ class SendingEngine:
             return ""
 
         return f"+{digits}" if has_plus else digits
+
+    def _start_playwright(self, log: Callable[[str], None]) -> None:
+        """Inicializa Playwright y muestra un mensaje claro si faltan los navegadores."""
+
+        try:
+            self.playwright = sync_playwright().start()
+        except PlaywrightError as e:
+            log("❌ Playwright no encontró el ejecutable de Chromium necesario para iniciar.")
+            log("   Ejecuta este comando y vuelve a intentarlo:")
+            log("   👉 playwright install chromium")
+            raise RuntimeError(
+                "Playwright requiere descargar los navegadores. Ejecuta 'playwright install chromium'."
+            ) from e
 
     def _open_browser_for_profile(self, profile_name: str) -> Page:
         """
