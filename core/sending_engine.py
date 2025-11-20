@@ -174,6 +174,9 @@ class SendingEngine:
             delay_min = max(1, campaign.get('delay_min', 1))
             delay_max = max(delay_min, campaign.get('delay_max', delay_min))
 
+            from core.templates_manager import TemplatesManager
+            templates_mgr = TemplatesManager()
+
             for idx, contact in enumerate(contacts, 1):
                 profile_name = profile_names[profile_index % len(profile_names)]
                 page: Page = self.sessions[profile_name]["page"]
@@ -187,8 +190,6 @@ class SendingEngine:
                     profile_index += 1
                     continue
 
-                from core.templates_manager import TemplatesManager
-                templates_mgr = TemplatesManager()
                 message = templates_mgr.apply_template(campaign['template_content'], contact)
 
                 try:
