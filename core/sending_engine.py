@@ -9,6 +9,7 @@ import random
 import re
 import subprocess
 import sys
+from time import monotonic
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, Optional
@@ -480,7 +481,7 @@ class SendingEngine:
                 "input[type='text'][aria-label*='teléfono']",
             ]
 
-            to_field = self._wait_first_visible(page, to_field_selectors, timeout=3000)
+            to_field = self._wait_first_visible(page, to_field_selectors, timeout=4500)
 
             if not to_field:
                 log("   ❌ No se encontró el campo 'Para' para pegar el número")
@@ -512,7 +513,7 @@ class SendingEngine:
             message_target = None
             for attempt in range(2):
                 message_target = self._wait_first_visible(
-                    page, text_field_selectors, frame=compose_frame, timeout=3000
+                    page, text_field_selectors, frame=compose_frame, timeout=4500
                 )
 
                 if message_target:
@@ -526,7 +527,7 @@ class SendingEngine:
                     wait_until="domcontentloaded",
                 )
 
-                to_field = self._wait_first_visible(page, to_field_selectors, timeout=3000)
+                to_field = self._wait_first_visible(page, to_field_selectors, timeout=4500)
                 if not to_field:
                     log("   ❌ No se pudo localizar el campo de mensaje")
                     return False
@@ -564,7 +565,7 @@ class SendingEngine:
                     send_button_selectors,
                     state="enabled",
                     frame=compose_frame,
-                    timeout=2000,
+                    timeout=2500,
                 )
 
                 if send_button:
@@ -605,10 +606,23 @@ class SendingEngine:
 
         context = frame if frame else page
 
+        total_timeout = max(0, timeout)
+        per_selector_timeout = total_timeout / max(len(selectors), 1)
+        started_at = monotonic()
+
         for selector in selectors:
+            elapsed = (monotonic() - started_at) * 1000
+            remaining = total_timeout - elapsed
+
+            if remaining <= 0:
+                break
+
             locator = context.locator(selector)
             try:
-                locator.wait_for(state=state, timeout=timeout)
+                locator.wait_for(
+                    state=state,
+                    timeout=min(per_selector_timeout, remaining),
+                )
                 return locator
             except PlaywrightTimeoutError:
                 continue
