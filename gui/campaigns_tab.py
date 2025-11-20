@@ -551,10 +551,18 @@ class CampaignsTab(QWidget):
 
         # Obtener columnas y respetar las variables elegidas
         all_columns = list(contacts[0].keys()) if contacts else []
-        preferred_vars = [
-            col for col in (selected_variables or all_columns)
-            if col in all_columns
-        ]
+
+        # Cuando las preferencias no coinciden con las columnas actuales,
+        # volvemos a seleccionar las columnas disponibles (excepto teléfonos
+        # auxiliares) para que siempre aparezcan botones en Campañas.
+        preferred_vars = [col for col in (selected_variables or []) if col in all_columns]
+        if not preferred_vars and all_columns:
+            preferred_vars = [
+                col for col in all_columns
+                if not col.startswith("Telefono_") or col == "Telefono_1"
+            ]
+            self.excel_processor.update_preferences({"selected_variables": preferred_vars})
+
         self.available_columns = preferred_vars
         self.sample_contact = contacts[0] if contacts else None
 
