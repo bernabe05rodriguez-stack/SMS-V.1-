@@ -345,10 +345,32 @@ class SendingEngine:
                 raise
 
         page: Page = context.pages[0] if context.pages else context.new_page()
-        page.set_default_timeout(12000)
+        default_timeout_ms = 12000
+        page.set_default_timeout(default_timeout_ms)
 
-        # Asegurar que la web esté cargada
-        page.goto("https://messages.google.com/web", wait_until="networkidle")
+        startup_timeout_ms = 60000
+        wait_strategies = ["domcontentloaded", "load"]
+        log(
+            "   ⏳ Cargando Messages Web con un tiempo extendido de "
+            f"{startup_timeout_ms / 1000:.0f}s..."
+        )
+
+        for attempt, wait_until in enumerate(wait_strategies, start=1):
+            try:
+                page.goto(
+                    "https://messages.google.com/web",
+                    wait_until=wait_until,
+                    timeout=startup_timeout_ms,
+                )
+                break
+            except PlaywrightTimeoutError:
+                log(
+                    "   ⚠️ El inicio tardó demasiado ("
+                    f"intento {attempt}/{len(wait_strategies)} usando wait_until='{wait_until}')."
+                )
+                if attempt == len(wait_strategies):
+                    raise
+
         self._ensure_messages_home(page)
 
         return page
