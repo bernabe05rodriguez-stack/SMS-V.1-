@@ -70,6 +70,8 @@ class CampaignsTab(QWidget):
         self.current_contacts_file = None
         self.sample_contact = None
         self.available_columns = []
+        self.loaded_contacts = []
+        self.phone_checkboxes = []
 
         self.init_ui()
         self.refresh_data()
@@ -202,6 +204,45 @@ class CampaignsTab(QWidget):
         config_layout.addRow("⏱️ Delay entre mensajes:", delay_layout)
 
         config_group.setLayout(config_layout)
+
+        # Selección de teléfonos
+        numbers_group = QGroupBox("📞 Teléfonos destino")
+        numbers_group.setObjectName("numbersGroup")
+        numbers_group.setStyleSheet("""
+            #numbersGroup {
+                border: 1px solid #2b3a48;
+                background: #0f1820;
+            }
+            #numbersGroup::title {
+                color: #e5e5e5;
+            }
+        """)
+        numbers_layout = QVBoxLayout()
+        numbers_layout.setSpacing(8)
+
+        self.numbers_info_label = QLabel(
+            "Cargá un Excel desde Perfiles para listar los teléfonos disponibles."
+        )
+        self.numbers_info_label.setStyleSheet("color: #9fb3c8;")
+        self.numbers_info_label.setWordWrap(True)
+        numbers_layout.addWidget(self.numbers_info_label)
+
+        self.select_all_numbers = QCheckBox("Seleccionar todos")
+        self.select_all_numbers.stateChanged.connect(self.toggle_all_numbers)
+        numbers_layout.addWidget(self.select_all_numbers)
+
+        self.numbers_container = QWidget()
+        self.numbers_container_layout = QVBoxLayout(self.numbers_container)
+        self.numbers_container_layout.setSpacing(6)
+        self.numbers_container_layout.setContentsMargins(4, 4, 4, 4)
+
+        numbers_scroll = QScrollArea()
+        numbers_scroll.setWidgetResizable(True)
+        numbers_scroll.setMaximumHeight(160)
+        numbers_scroll.setWidget(self.numbers_container)
+        numbers_layout.addWidget(numbers_scroll)
+
+        numbers_group.setLayout(numbers_layout)
 
         # Sección de variables disponibles
         variables_group = QGroupBox("🏷️ Variables Disponibles")
@@ -373,6 +414,9 @@ class CampaignsTab(QWidget):
         # Configuración básica (reubicada debajo del mensaje)
         layout.addWidget(config_group)
 
+        # Teléfonos disponibles desde el Excel
+        layout.addWidget(numbers_group)
+
         # Perfiles activos - CON SELECCIÓN MÚLTIPLE
         profiles_group = QGroupBox("👥 Seleccionar Perfiles")
         profiles_group.setStyleSheet("""
@@ -499,6 +543,8 @@ class CampaignsTab(QWidget):
             self.update_preview()
             return
 
+        self.load_phone_numbers(filename)
+
         # Cargar archivo procesado
         contacts = self.excel_processor.load_processed_file(filename)
 
@@ -574,6 +620,24 @@ class CampaignsTab(QWidget):
     def get_selected_profiles(self):
         """Retorna los nombres de perfiles marcados."""
         return [cb.text() for cb in self.profile_checkboxes if cb.isChecked()]
+
+    def toggle_all_numbers(self, state):
+        """Marca o desmarca todos los teléfonos."""
+        for checkbox in self.phone_checkboxes:
+            checkbox.blockSignals(True)
+            checkbox.setChecked(state == Qt.Checked)
+            checkbox.blockSignals(False)
+
+    def handle_number_checkbox(self):
+        """Sincroniza el checkbox de "seleccionar todos"."""
+        all_checked = all(cb.isChecked() for cb in self.phone_checkboxes) if self.phone_checkboxes else False
+        self.select_all_numbers.blockSignals(True)
+        self.select_all_numbers.setChecked(all_checked)
+        self.select_all_numbers.blockSignals(False)
+
+    def get_selected_numbers(self):
+        """Retorna los teléfonos marcados para el envío."""
+        return [cb.text() for cb in self.phone_checkboxes if cb.isChecked()]
 
     def sync_delay_bounds(self):
         """Asegura que el máximo nunca sea menor al mínimo."""
@@ -674,9 +738,60 @@ class CampaignsTab(QWidget):
             if self.templates_manager.delete_template(template_name):
                 QMessageBox.information(self, "Éxito", "Plantilla eliminada")
                 self.refresh_data()
-                self.template_editor.clear()
-            else:
-                QMessageBox.warning(self, "Error", "No se pudo eliminar la plantilla")
+            self.template_editor.clear()
+        else:
+            QMessageBox.warning(self, "Error", "No se pudo eliminar la plantilla")
+
+    def load_phone_numbers(self, filename):
+        """Carga los teléfonos disponibles del archivo procesado."""
+        # Limpiar contenedor
+        for i in reversed(range(self.numbers_container_layout.count())):
+            item = self.numbers_container_layout.takeAt(i)
+            if item and item.widget():
+                item.widget().deleteLater()
+        self.phone_checkboxes.clear()
+        self.loaded_contacts = []
+
+        if not filename:
+            self.numbers_info_label.setText(
+                "Cargá un Excel desde Perfiles para elegir los teléfonos a usar."
+            )
+            self.select_all_numbers.setChecked(False)
+            self.select_all_numbers.setEnabled(False)
+            return
+
+        contacts = self.excel_processor.load_processed_file(filename) or []
+        self.loaded_contacts = contacts
+
+        phone_set = {
+            str(contact.get('Telefono_1', '')).strip()
+            for contact in contacts
+            if str(contact.get('Telefono_1', '')).strip()
+        }
+
+        phone_list = sorted(phone_set)
+
+        if not phone_list:
+            self.numbers_info_label.setText(
+                "No se detectaron teléfonos en el archivo cargado."
+            )
+            self.select_all_numbers.setChecked(False)
+            self.select_all_numbers.setEnabled(False)
+            return
+
+        self.numbers_info_label.setText(
+            f"Se encontraron {len(phone_list)} teléfonos. Marcá los que quieras usar (separados por '-' ya vienen desglosados)."
+        )
+
+        for phone in phone_list:
+            cb = QCheckBox(phone)
+            cb.setChecked(True)
+            cb.stateChanged.connect(self.handle_number_checkbox)
+            self.phone_checkboxes.append(cb)
+            self.numbers_container_layout.addWidget(cb)
+
+        self.select_all_numbers.setEnabled(True)
+        self.select_all_numbers.setChecked(True)
 
     def send_now(self):
         """Inicia el envío inmediato de una campaña."""
@@ -705,6 +820,11 @@ class CampaignsTab(QWidget):
             QMessageBox.warning(self, "Error", "Debe seleccionar al menos un perfil")
             return
 
+        selected_numbers = self.get_selected_numbers()
+        if not selected_numbers:
+            QMessageBox.warning(self, "Error", "Debes elegir al menos un teléfono para enviar")
+            return
+
         delay_min = self.delay_min_spin.value()
         delay_max = self.delay_max_spin.value()
 
@@ -715,6 +835,7 @@ class CampaignsTab(QWidget):
             f"¿Iniciar envío de campaña '{campaign_name}'?\n\n"
             f"• Perfiles: {len(selected_profiles)}\n"
             f"• Contactos: {contacts_file}\n"
+            f"• Teléfonos seleccionados: {len(selected_numbers)}\n"
             f"• Delay: entre {delay_min} y {delay_max} segundos\n\n"
             "Se abrirán los navegadores automáticamente.",
             QMessageBox.Yes | QMessageBox.No
@@ -730,6 +851,7 @@ class CampaignsTab(QWidget):
             'template_content': template_content,
             'profiles': selected_profiles,
             'contacts_file': contacts_file,
+            'selected_numbers': selected_numbers,
             'delay_min': delay_min,
             'delay_max': delay_max
         }

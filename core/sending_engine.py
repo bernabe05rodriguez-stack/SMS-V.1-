@@ -156,6 +156,16 @@ class SendingEngine:
             if not contacts:
                 return False, "No se pudieron cargar los contactos"
 
+            selected_numbers = campaign.get('selected_numbers') or []
+            if selected_numbers:
+                contacts = [
+                    c for c in contacts
+                    if str(c.get('Telefono_1', '')).strip() in selected_numbers
+                ]
+
+                if not contacts:
+                    return False, "No hay contactos disponibles después de filtrar los teléfonos seleccionados"
+
             campaign['total_messages'] = len(contacts)
             campaign['status'] = 'running'
 
