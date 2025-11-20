@@ -8,10 +8,22 @@ import platform
 import shutil
 import subprocess
 from pathlib import Path
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLineEdit, QLabel, QMessageBox, QSizePolicy,
-                               QScrollArea, QGroupBox, QFileDialog, QCheckBox,
-                               QFrame)
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLineEdit,
+    QLabel,
+    QMessageBox,
+    QSizePolicy,
+    QScrollArea,
+    QGroupBox,
+    QFileDialog,
+    QCheckBox,
+    QFrame,
+    QToolButton,
+)
 from PySide6.QtCore import Qt
 from core.profiles_manager import ProfilesManager
 from core.excel_processor import ExcelProcessor
@@ -178,38 +190,58 @@ class ProfilesTab(QWidget):
         self.excel_status_label.setStyleSheet("color: #bbbbbb;")
         excel_layout.addWidget(self.excel_status_label)
 
-        # Selector de campos telefónicos detectados
+        # Selector de campos telefónicos detectados (colapsable)
+        phone_section = self.create_collapsible_section(
+            "Teléfonos disponibles"
+        )
+        self.phone_section_toggle = phone_section["toggle"]
         self.phone_fields_label = QLabel(
             "📞 Elegí qué columnas de teléfono querés usar para las campañas."
         )
         self.phone_fields_label.setWordWrap(True)
         self.phone_fields_label.setStyleSheet("color: #9fb3c8;")
-        excel_layout.addWidget(self.phone_fields_label)
+        phone_section["content_layout"].addWidget(self.phone_fields_label)
 
         self.phone_fields_container = QWidget()
         self.phone_fields_layout = QVBoxLayout(self.phone_fields_container)
         self.phone_fields_layout.setContentsMargins(6, 2, 6, 2)
         self.phone_fields_layout.setSpacing(4)
-        excel_layout.addWidget(self.phone_fields_container)
+        phone_section["content_layout"].addWidget(self.phone_fields_container)
+
+        self.confirm_phone_btn = QPushButton("Confirmar teléfonos seleccionados")
+        self.confirm_phone_btn.setEnabled(False)
+        self.confirm_phone_btn.clicked.connect(self.confirm_phone_field_selection)
+        phone_section["content_layout"].addWidget(self.confirm_phone_btn)
+        excel_layout.addWidget(phone_section["container"])
 
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
         excel_layout.addWidget(line)
 
-        # Selector de variables disponibles
+        # Selector de variables disponibles (colapsable)
+        variables_section = self.create_collapsible_section(
+            "Variables disponibles"
+        )
+        self.variables_section_toggle = variables_section["toggle"]
         self.variables_hint_label = QLabel(
             "🏷️ Seleccioná qué columnas del Excel querés usar en tus mensajes."
         )
         self.variables_hint_label.setWordWrap(True)
         self.variables_hint_label.setStyleSheet("color: #9fb3c8;")
-        excel_layout.addWidget(self.variables_hint_label)
+        variables_section["content_layout"].addWidget(self.variables_hint_label)
 
         self.variables_container = QWidget()
         self.variables_layout = QVBoxLayout(self.variables_container)
         self.variables_layout.setContentsMargins(6, 2, 6, 2)
         self.variables_layout.setSpacing(4)
-        excel_layout.addWidget(self.variables_container)
+        variables_section["content_layout"].addWidget(self.variables_container)
+
+        self.confirm_variables_btn = QPushButton("Confirmar variables seleccionadas")
+        self.confirm_variables_btn.setEnabled(False)
+        self.confirm_variables_btn.clicked.connect(self.confirm_variable_selection)
+        variables_section["content_layout"].addWidget(self.confirm_variables_btn)
+        excel_layout.addWidget(variables_section["container"])
 
         layout.addWidget(excel_group)
         
@@ -223,6 +255,62 @@ class ProfilesTab(QWidget):
             self.toggle_profiles_btn.setText("Ocultar perfiles creados")
         else:
             self.toggle_profiles_btn.setText("Mostrar perfiles creados")
+
+    def create_collapsible_section(self, title):
+        """Crea un bloque colapsable con un botón de despliegue."""
+        container = QGroupBox()
+        container.setStyleSheet(
+            "QGroupBox {"
+            "  border: 1px solid #1f2d38;"
+            "  border-radius: 12px;"
+            "  padding: 6px;"
+            "  background: #0f1820;"
+            "}"
+        )
+
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
+
+        toggle = QToolButton()
+        toggle.setText(title)
+        toggle.setCheckable(True)
+        toggle.setChecked(False)
+        toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        toggle.setArrowType(Qt.RightArrow)
+        toggle.setStyleSheet(
+            "QToolButton {"
+            "  color: white;"
+            "  font-weight: 600;"
+            "  padding: 6px 8px;"
+            "  background: transparent;"
+            "  border: none;"
+            "}"
+            "QToolButton:checked { color: #67b0e8; }"
+        )
+        layout.addWidget(toggle)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(6, 2, 6, 6)
+        content_layout.setSpacing(6)
+        content.setVisible(False)
+        layout.addWidget(content)
+
+        toggle.toggled.connect(lambda checked: self.toggle_section(toggle, content, checked))
+
+        return {
+            "container": container,
+            "toggle": toggle,
+            "content": content,
+            "content_layout": content_layout,
+        }
+
+    @staticmethod
+    def toggle_section(toggle_button, content_widget, checked):
+        """Abre/cierra el contenido de una sección colapsable."""
+        toggle_button.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
+        content_widget.setVisible(checked)
     
     def create_profile(self):
         """Crea un nuevo perfil."""
@@ -358,21 +446,13 @@ class ProfilesTab(QWidget):
         self.profiles_layout.addStretch()
 
     def load_saved_excel_preferences(self):
-        """Carga las preferencias guardadas de teléfonos y variables al iniciar."""
-        prefs = self.excel_processor.load_preferences()
-
-        if prefs.get("last_file"):
-            processed_path = os.path.join(
-                self.excel_processor.processed_dir,
-                prefs["last_file"],
-            )
-
-            if os.path.exists(processed_path):
-                self.last_uploaded_excel = prefs["last_file"]
-                self.excel_status_label.setText(
-                    f"⚡ Usando el último Excel procesado: {prefs['last_file']}"
-                )
-                self.render_excel_metadata(prefs["last_file"])
+        """Resetea la sección de Excel para iniciar siempre en limpio."""
+        self.last_uploaded_excel = None
+        self.clear_selectors()
+        self.excel_status_label.setText(
+            "Todavía no cargaste ningún archivo."
+        )
+        self.excel_processor.update_preferences({"last_file": None})
 
     def upload_excel_file(self):
         """Sube y procesa un archivo Excel/CSV desde el bloque de perfiles."""
@@ -398,11 +478,6 @@ class ProfilesTab(QWidget):
                 self.last_uploaded_excel = processed_name
                 self.excel_status_label.setText(
                     f"✅ '{filename}' procesado ({count} registros)."
-                )
-                self.excel_processor.update_preferences(
-                    {
-                        "last_file": processed_name,
-                    }
                 )
                 self.render_excel_metadata(processed_name)
                 QMessageBox.information(self, "Excel procesado", message)
@@ -430,7 +505,10 @@ class ProfilesTab(QWidget):
 
         prefs = self.excel_processor.load_preferences()
         available_phone_fields = self.excel_processor.get_phone_fields_from_contacts(contacts)
-        selected_phone_fields = prefs.get("selected_phone_fields") or available_phone_fields
+        selected_phone_fields = [
+            field for field in prefs.get("selected_phone_fields", [])
+            if field in available_phone_fields
+        ] or available_phone_fields
 
         self.build_phone_field_selector(
             available_phone_fields,
@@ -443,16 +521,11 @@ class ProfilesTab(QWidget):
             col for col in available_columns
             if not col.startswith("Telefono_") or col == "Telefono_1"
         ]
-        selected_variables = prefs.get("selected_variables") or default_variables
+        selected_variables = [
+            col for col in prefs.get("selected_variables", [])
+            if col in available_columns
+        ] or default_variables
         self.build_variables_selector(available_columns, selected_variables)
-
-        self.excel_processor.update_preferences(
-            {
-                "selected_phone_fields": selected_phone_fields,
-                "selected_variables": selected_variables,
-                "last_file": processed_filename,
-            }
-        )
 
     def build_phone_field_selector(self, available_fields, selected_fields, contacts):
         """Crea las casillas para elegir columnas de teléfono."""
@@ -461,10 +534,13 @@ class ProfilesTab(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
+        self.confirm_phone_btn.setEnabled(bool(available_fields))
+
         if not available_fields:
             self.phone_fields_label.setText(
                 "⚠️ No se detectaron columnas con formato Telefono_1 ... Telefono_9."
             )
+            self.phone_section_toggle.setChecked(False)
             return
 
         self.phone_fields_label.setText(
@@ -478,7 +554,6 @@ class ProfilesTab(QWidget):
             ])
             checkbox = QCheckBox(f"{field} ({count} números)")
             checkbox.setChecked(field in selected_fields)
-            checkbox.stateChanged.connect(self.save_phone_field_preferences)
             checkbox.setProperty("field_name", field)
             self.phone_fields_layout.addWidget(checkbox)
 
@@ -489,10 +564,13 @@ class ProfilesTab(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
+        self.confirm_variables_btn.setEnabled(bool(available_columns))
+
         if not available_columns:
             self.variables_hint_label.setText(
                 "⚠️ No hay columnas disponibles en el archivo procesado."
             )
+            self.variables_section_toggle.setChecked(False)
             return
 
         self.variables_hint_label.setText(
@@ -502,35 +580,52 @@ class ProfilesTab(QWidget):
         for column in available_columns:
             checkbox = QCheckBox(column)
             checkbox.setChecked(column in selected_columns)
-            checkbox.stateChanged.connect(self.save_variable_preferences)
             checkbox.setProperty("column_name", column)
             self.variables_layout.addWidget(checkbox)
 
-    def save_phone_field_preferences(self):
-        """Guarda la selección de columnas de teléfono."""
-        selected = []
-        for i in range(self.phone_fields_layout.count()):
-            item = self.phone_fields_layout.itemAt(i)
-            widget = item.widget()
-            if isinstance(widget, QCheckBox) and widget.isChecked():
-                field_name = widget.property("field_name")
-                if field_name:
-                    selected.append(field_name)
-
+    def confirm_phone_field_selection(self):
+        """Guarda la selección de columnas de teléfono al confirmar."""
+        selected = self.collect_checked_properties(self.phone_fields_layout, "field_name")
         self.excel_processor.update_preferences({"selected_phone_fields": selected})
+        QMessageBox.information(
+            self,
+            "Teléfonos confirmados",
+            "Se guardaron las columnas de teléfono seleccionadas.",
+        )
 
-    def save_variable_preferences(self):
-        """Guarda la selección de variables disponibles."""
+    def confirm_variable_selection(self):
+        """Guarda la selección de variables disponibles al confirmar."""
+        selected = self.collect_checked_properties(self.variables_layout, "column_name")
+        self.excel_processor.update_preferences({"selected_variables": selected})
+        QMessageBox.information(
+            self,
+            "Variables confirmadas",
+            "Se guardaron las variables seleccionadas.",
+        )
+
+    @staticmethod
+    def collect_checked_properties(layout, property_name):
+        """Retorna los valores marcados dentro de un layout de checkboxes."""
         selected = []
-        for i in range(self.variables_layout.count()):
-            item = self.variables_layout.itemAt(i)
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
             widget = item.widget()
             if isinstance(widget, QCheckBox) and widget.isChecked():
-                column_name = widget.property("column_name")
-                if column_name:
-                    selected.append(column_name)
+                value = widget.property(property_name)
+                if value:
+                    selected.append(value)
+        return selected
 
-        self.excel_processor.update_preferences({"selected_variables": selected})
+    def clear_selectors(self):
+        """Limpia las listas de selección y deshabilita confirmaciones."""
+        for layout in (self.phone_fields_layout, self.variables_layout):
+            while layout.count():
+                item = layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+
+        self.confirm_phone_btn.setEnabled(False)
+        self.confirm_variables_btn.setEnabled(False)
     
     def open_browser(self, profile_name):
         """Abre Chrome con el perfil específico en Google Messages."""
