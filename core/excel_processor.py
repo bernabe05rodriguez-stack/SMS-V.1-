@@ -16,10 +16,13 @@ class ExcelProcessor:
         """Inicializa el procesador."""
         self.uploads_dir = "data/uploads"
         self.processed_dir = "data/processed"
+        self.preferences_file = os.path.join(self.processed_dir, "preferences.json")
         
         # Crear directorios si no existen
         os.makedirs(self.uploads_dir, exist_ok=True)
         os.makedirs(self.processed_dir, exist_ok=True)
+        if not os.path.exists(self.preferences_file):
+            self.save_preferences()
     
     def get_uploaded_files(self):
         """Retorna lista de archivos Excel/CSV en el directorio de uploads."""
@@ -87,7 +90,7 @@ class ExcelProcessor:
         """
         # Crear copia para no modificar original
         df = df.copy()
-        
+
         # Expandir teléfonos separados por guión
         df = self._expand_phone_numbers(df)
         
@@ -121,7 +124,7 @@ class ExcelProcessor:
         df = df.reset_index(drop=True)
         
         return df
-    
+
     def _expand_phone_numbers(self, df):
         """
         Expande filas cuando hay múltiples teléfonos separados por guión.
@@ -132,28 +135,120 @@ class ExcelProcessor:
         Returns:
             DataFrame expandido
         """
-        # Buscar columna Telefono_1
-        if 'Telefono_1' not in df.columns:
+        phone_columns = self._get_phone_columns(df.columns)
+
+        if not phone_columns:
             return df
-        
+
         expanded_rows = []
-        
+
         for _, row in df.iterrows():
-            phone = str(row['Telefono_1'])
-            
-            # Si contiene guión, separar
-            if '-' in phone:
-                phones = [p.strip() for p in phone.split('-') if p.strip()]
-                
-                # Crear una fila por cada teléfono
-                for phone_num in phones:
+            found_numbers = False
+
+            for phone_col in phone_columns:
+                raw_value = row.get(phone_col, None)
+
+                if pd.isna(raw_value):
+                    continue
+
+                phone_text = str(raw_value).strip()
+
+                if not phone_text:
+                    continue
+
+                numbers = self._split_phone_values(phone_text)
+
+                for phone_num in numbers:
                     new_row = row.copy()
                     new_row['Telefono_1'] = phone_num
+                    new_row['Telefono_origen'] = phone_col
+                    new_row['Telefono_seleccionado'] = phone_num
                     expanded_rows.append(new_row)
-            else:
+                    found_numbers = True
+
+            if not found_numbers:
                 expanded_rows.append(row)
-        
+
         return pd.DataFrame(expanded_rows)
+
+    def _split_phone_values(self, phone_text):
+        """Divide un texto de teléfonos por '-', limpiando espacios y vacíos."""
+        return [
+            segment.strip()
+            for segment in str(phone_text).split('-')
+            if segment and segment.strip().lower() not in ("nan", "none")
+        ]
+
+    def _get_phone_columns(self, columns):
+        """Retorna las columnas que coinciden con el patrón Telefono_1 a Telefono_9."""
+        return [
+            col for col in columns
+            if isinstance(col, str) and col.startswith('Telefono_') and col.split('_')[-1].isdigit()
+        ]
+
+    def get_phone_fields_from_contacts(self, contacts):
+        """Detecta los campos de teléfono disponibles en la lista de contactos."""
+        if not contacts:
+            return []
+
+        columns = contacts[0].keys()
+        return self._get_phone_columns(columns)
+
+    def collect_numbers(self, contacts, allowed_phone_fields=None):
+        """Extrae una lista de números únicos según los campos seleccionados."""
+        if not contacts:
+            return []
+
+        allowed = set(allowed_phone_fields or [])
+
+        numbers = {
+            str(contact.get('Telefono_1', '')).strip()
+            for contact in contacts
+            if str(contact.get('Telefono_1', '')).strip()
+            and (
+                not allowed
+                or contact.get('Telefono_origen', 'Telefono_1') in allowed
+            )
+        }
+
+        return sorted(numbers)
+
+    def save_preferences(self, selected_phone_fields=None, selected_variables=None, last_file=None):
+        """Guarda las preferencias de campos telefónicos y variables disponibles."""
+        data = {
+            "selected_phone_fields": selected_phone_fields or [],
+            "selected_variables": selected_variables or [],
+            "last_file": last_file or None,
+        }
+
+        with open(self.preferences_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def load_preferences(self):
+        """Carga las preferencias guardadas para campos y variables."""
+        if not os.path.exists(self.preferences_file):
+            return {
+                "selected_phone_fields": [],
+                "selected_variables": [],
+                "last_file": None,
+            }
+
+        try:
+            with open(self.preferences_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {
+                "selected_phone_fields": [],
+                "selected_variables": [],
+                "last_file": None,
+            }
+
+    def update_preferences(self, new_values):
+        """Actualiza parcialmente las preferencias guardadas."""
+        prefs = self.load_preferences()
+        prefs.update({k: v for k, v in new_values.items() if v is not None})
+        with open(self.preferences_file, 'w', encoding='utf-8') as f:
+            json.dump(prefs, f, indent=2, ensure_ascii=False)
     
     def get_processed_files(self):
         """Retorna lista de archivos procesados."""

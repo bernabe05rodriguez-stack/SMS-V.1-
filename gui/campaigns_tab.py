@@ -245,51 +245,6 @@ class CampaignsTab(QWidget):
 
         numbers_group.setLayout(numbers_layout)
 
-        # Sección de variables disponibles
-        variables_group = QGroupBox("🏷️ Variables Disponibles")
-        variables_group.setObjectName("variablesGroup")
-        variables_group.setStyleSheet("""
-            #variablesGroup {
-                border: 1px solid #1f5c7a;
-                background: #0b161f;
-            }
-            #variablesGroup::title {
-                color: #56a6d7;
-            }
-        """)
-        variables_layout = QVBoxLayout()
-        variables_layout.setContentsMargins(10, 8, 10, 10)
-        variables_layout.setSpacing(6)
-
-        self.variables_label = QLabel(
-            "💡 Subí un Excel desde Perfiles para ver las variables disponibles."
-        )
-        self.variables_label.setStyleSheet("color: #9fb3c8; font-style: italic; padding: 4px 0;")
-        self.variables_label.setWordWrap(True)
-        variables_layout.addWidget(self.variables_label)
-
-        # Contenedor scrollable para variables
-        variables_scroll = QScrollArea()
-        variables_scroll.setWidgetResizable(True)
-        variables_scroll.setMaximumHeight(80)
-        variables_scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-        """)
-
-        self.variables_widget = QWidget()
-        self.variables_layout = QHBoxLayout(self.variables_widget)
-        self.variables_layout.setAlignment(Qt.AlignLeft)
-        self.variables_layout.setSpacing(4)
-        self.variables_layout.setContentsMargins(2, 2, 2, 2)
-        variables_scroll.setWidget(self.variables_widget)
-
-        variables_layout.addWidget(variables_scroll)
-        variables_group.setLayout(variables_layout)
-        layout.addWidget(variables_group)
-
         # Sección de plantillas
         templates_group = QGroupBox("✍️ Mensaje de la Campaña")
         templates_group.setObjectName("templatesGroup")
@@ -303,6 +258,34 @@ class CampaignsTab(QWidget):
             }
         """)
         templates_layout = QVBoxLayout()
+
+        # Variables seleccionadas desde Perfiles
+        self.variables_hint = QLabel(
+            "💡 Las variables que marques en 'Perfiles' aparecerán aquí para insertarlas."
+        )
+        self.variables_hint.setStyleSheet("color: #9fb3c8;")
+        self.variables_hint.setWordWrap(True)
+        templates_layout.addWidget(self.variables_hint)
+
+        variables_scroll = QScrollArea()
+        variables_scroll.setWidgetResizable(True)
+        variables_scroll.setMaximumHeight(90)
+        variables_scroll.setStyleSheet("""
+            QScrollArea {
+                border: 1px solid #1f5c7a;
+                background: #0b161f;
+                border-radius: 10px;
+            }
+        """)
+
+        self.template_variables_widget = QWidget()
+        self.template_variables_layout = QHBoxLayout(self.template_variables_widget)
+        self.template_variables_layout.setAlignment(Qt.AlignLeft)
+        self.template_variables_layout.setSpacing(6)
+        self.template_variables_layout.setContentsMargins(8, 6, 8, 6)
+        variables_scroll.setWidget(self.template_variables_widget)
+
+        templates_layout.addWidget(variables_scroll)
 
         # Selector de plantilla
         selector_layout = QHBoxLayout()
@@ -532,54 +515,84 @@ class CampaignsTab(QWidget):
     def load_available_columns(self, filename):
         """Carga las columnas disponibles del archivo seleccionado."""
         if not filename:
-            self.variables_label.setText(
+            self.variables_hint.setText(
                 "💡 Subí un Excel desde Perfiles para ver las variables disponibles."
             )
-            # Limpiar botones de variables
-            while self.variables_layout.count():
-                child = self.variables_layout.takeAt(0)
-                if child.widget():
-                    child.widget().deleteLater()
+            self.update_template_variables([])
             self.available_columns = []
             self.sample_contact = None
             self.update_preview()
             return
 
-        self.load_phone_numbers(filename)
-
         # Cargar archivo procesado
         contacts = self.excel_processor.load_processed_file(filename)
 
         if not contacts or len(contacts) == 0:
-            self.variables_label.setText("⚠️ No se pudieron cargar las columnas del archivo")
+            self.variables_hint.setText("⚠️ No se pudieron cargar las columnas del archivo")
             self.available_columns = []
             self.sample_contact = None
             return
 
-        # Obtener columnas del primer registro
-        self.available_columns = list(contacts[0].keys())
-        self.sample_contact = contacts[0]
+        prefs = self.excel_processor.load_preferences()
+        selected_phone_fields = prefs.get("selected_phone_fields") or []
+        selected_variables = prefs.get("selected_variables")
 
-        self.variables_label.setText(f"✨ {len(self.available_columns)} variables disponibles - Haz clic para insertar:")
+        # Filtrar contactos por campos telefónicos elegidos
+        if selected_phone_fields:
+            contacts = [
+                c for c in contacts
+                if c.get('Telefono_origen', 'Telefono_1') in selected_phone_fields
+            ]
 
-        # Limpiar botones anteriores
-        while self.variables_layout.count():
-            child = self.variables_layout.takeAt(0)
+        self.load_phone_numbers(filename, contacts_override=contacts)
+
+        # Obtener columnas y respetar las variables elegidas
+        all_columns = list(contacts[0].keys()) if contacts else []
+        preferred_vars = [
+            col for col in (selected_variables or all_columns)
+            if col in all_columns
+        ]
+        self.available_columns = preferred_vars
+        self.sample_contact = contacts[0] if contacts else None
+
+        if not preferred_vars:
+            self.variables_hint.setText(
+                "⚠️ No marcaste variables en Perfiles. Selecciónalas para usarlas aquí."
+            )
+        else:
+            self.variables_hint.setText(
+                f"✨ Variables listas para insertar ({len(preferred_vars)}):"
+            )
+
+        self.update_template_variables(preferred_vars)
+        self.update_preview()
+
+    def update_template_variables(self, columns):
+        """Actualiza los botones de variables en el bloque de mensaje."""
+        while self.template_variables_layout.count():
+            child = self.template_variables_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
 
-        # Crear botones para cada variable
-        for column in self.available_columns:
+        if not columns:
+            empty_label = QLabel(
+                "No hay variables seleccionadas. Configúralas en la pestaña 'Perfiles'."
+            )
+            empty_label.setStyleSheet("color: #9fb3c8;")
+            self.template_variables_layout.addWidget(empty_label)
+            return
+
+        for column in columns:
             btn = QPushButton(f"{{{column}}}")
             btn.setStyleSheet("""
                 QPushButton {
                     background: #12354a;
                     color: #e5e5e5;
-                    padding: 4px 8px;
+                    padding: 6px 10px;
                     margin: 2px;
-                    border-radius: 6px;
-                    font-weight: 600;
-                    font-size: 11px;
+                    border-radius: 8px;
+                    font-weight: 700;
+                    font-size: 12px;
                     border: 1px solid #1f5c7a;
                 }
                 QPushButton:hover {
@@ -587,9 +600,7 @@ class CampaignsTab(QWidget):
                 }
             """)
             btn.clicked.connect(lambda checked, col=column: self.insert_variable(col))
-            self.variables_layout.addWidget(btn)
-
-        self.update_preview()
+            self.template_variables_layout.addWidget(btn)
 
     def insert_variable(self, column_name):
         """Inserta una variable en el editor de plantilla."""
@@ -753,7 +764,7 @@ class CampaignsTab(QWidget):
         else:
             QMessageBox.warning(self, "Error", "No se pudo eliminar la plantilla")
 
-    def load_phone_numbers(self, filename):
+    def load_phone_numbers(self, filename, contacts_override=None):
         """Carga los teléfonos disponibles del archivo procesado."""
         # Limpiar contenedor
         for i in reversed(range(self.numbers_container_layout.count())):
@@ -771,16 +782,25 @@ class CampaignsTab(QWidget):
             self.select_all_numbers.setEnabled(False)
             return
 
-        contacts = self.excel_processor.load_processed_file(filename) or []
+        contacts = contacts_override
+        if contacts is None:
+            contacts = self.excel_processor.load_processed_file(filename) or []
+
+        prefs = self.excel_processor.load_preferences()
+        selected_phone_fields = prefs.get("selected_phone_fields") or []
+
+        if selected_phone_fields:
+            contacts = [
+                c for c in contacts
+                if c.get('Telefono_origen', 'Telefono_1') in selected_phone_fields
+            ]
+
         self.loaded_contacts = contacts
 
-        phone_set = {
-            str(contact.get('Telefono_1', '')).strip()
-            for contact in contacts
-            if str(contact.get('Telefono_1', '')).strip()
-        }
-
-        phone_list = sorted(phone_set)
+        phone_list = self.excel_processor.collect_numbers(
+            contacts,
+            allowed_phone_fields=selected_phone_fields,
+        )
 
         total_numbers = len(phone_list)
         if total_numbers > self.max_numbers_to_show:
