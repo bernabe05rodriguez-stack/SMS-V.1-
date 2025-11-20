@@ -68,6 +68,17 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.profiles_tab, "👤 Perfiles")
         self.tabs.addTab(self.campaigns_tab, "🚀 Campañas")
         self.tabs.addTab(self.status_tab, "📈 Estado de Envíos")
+
+        # Refrescar datos dinámicos al cambiar de pestaña
+        self.tabs.currentChanged.connect(self.on_tab_changed)
+
+    def on_tab_changed(self, index):
+        """Realiza acciones adicionales según la pestaña seleccionada."""
+        current_tab = self.tabs.widget(index)
+
+        if current_tab is self.campaigns_tab:
+            # Sincronizar plantillas, contactos y perfiles al abrir la pestaña
+            self.campaigns_tab.refresh_data()
     
     def apply_modern_theme(self):
         """Aplica un tema moderno y atractivo a la aplicación."""
