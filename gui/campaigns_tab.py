@@ -724,14 +724,19 @@ class CampaignsTab(QWidget):
 
     def update_contacts_source(self):
         """Detecta y muestra el último archivo de contactos procesado."""
+        prefs = self.excel_processor.load_preferences()
+        preferred_file = prefs.get("last_file")
         latest_file = self.excel_processor.get_latest_processed_file()
-        self.current_contacts_file = latest_file
 
-        if latest_file:
+        # Dar prioridad al archivo confirmado en Perfiles, si existe
+        chosen_file = preferred_file if preferred_file else latest_file
+        self.current_contacts_file = chosen_file
+
+        if chosen_file:
             self.contacts_info_label.setText(
-                f"Usando: <b>{latest_file}</b> (subido desde Perfiles)"
+                f"Usando: <b>{chosen_file}</b> (subido desde Perfiles)"
             )
-            self.load_available_columns(latest_file)
+            self.load_available_columns(chosen_file)
         else:
             self.contacts_info_label.setText(
                 "⚠️ No hay archivos procesados. Subí un Excel desde la pestaña Perfiles."

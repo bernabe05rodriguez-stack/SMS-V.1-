@@ -476,6 +476,8 @@ class ProfilesTab(QWidget):
             if success:
                 processed_name = f"{Path(filename).stem}_processed.json"
                 self.last_uploaded_excel = processed_name
+                # Guardar el último archivo procesado para sincronizarlo con Campañas
+                self.excel_processor.update_preferences({"last_file": processed_name})
                 self.excel_status_label.setText(
                     f"✅ '{filename}' procesado ({count} registros)."
                 )
