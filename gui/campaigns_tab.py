@@ -72,6 +72,7 @@ class CampaignsTab(QWidget):
         self.available_columns = []
         self.loaded_contacts = []
         self.phone_checkboxes = []
+        self.max_numbers_to_show = 500
 
         self.init_ui()
         self.refresh_data()
@@ -539,6 +540,7 @@ class CampaignsTab(QWidget):
                 child = self.variables_layout.takeAt(0)
                 if child.widget():
                     child.widget().deleteLater()
+            self.available_columns = []
             self.sample_contact = None
             self.update_preview()
             return
@@ -550,6 +552,8 @@ class CampaignsTab(QWidget):
 
         if not contacts or len(contacts) == 0:
             self.variables_label.setText("⚠️ No se pudieron cargar las columnas del archivo")
+            self.available_columns = []
+            self.sample_contact = None
             return
 
         # Obtener columnas del primer registro
@@ -645,29 +649,36 @@ class CampaignsTab(QWidget):
 
     def refresh_data(self):
         """Actualiza los datos de plantillas, contactos y perfiles."""
-        # Plantillas
-        self.template_combo.clear()
-        templates = self.templates_manager.get_templates()
-        for template in templates:
-            self.template_combo.addItem(template['nombre'])
+        try:
+            # Plantillas
+            self.template_combo.clear()
+            templates = self.templates_manager.get_templates() or []
+            for template in templates:
+                self.template_combo.addItem(template.get('nombre', ''))
 
-        # Contactos procesados - usar el último automáticamente
-        self.update_contacts_source()
+            # Contactos procesados - usar el último automáticamente
+            self.update_contacts_source()
 
-        # Perfiles - MOSTRAR TODOS (activos e inactivos)
-        # Limpiar contenedor anterior
-        for i in reversed(range(self.profiles_container_layout.count())):
-            item = self.profiles_container_layout.takeAt(i)
-            if item and item.widget():
-                item.widget().deleteLater()
-        self.profile_checkboxes.clear()
+            # Perfiles - MOSTRAR TODOS (activos e inactivos)
+            # Limpiar contenedor anterior
+            for i in reversed(range(self.profiles_container_layout.count())):
+                item = self.profiles_container_layout.takeAt(i)
+                if item and item.widget():
+                    item.widget().deleteLater()
+            self.profile_checkboxes.clear()
 
-        all_profiles = self.profiles_manager.get_profiles()
-        for profile in all_profiles:
-            checkbox = QCheckBox(profile['nombre'])
-            checkbox.setChecked(profile.get('activo', False))
-            self.profile_checkboxes.append(checkbox)
-            self.profiles_container_layout.addWidget(checkbox)
+            all_profiles = self.profiles_manager.get_profiles() or []
+            for profile in all_profiles:
+                checkbox = QCheckBox(profile.get('nombre', ''))
+                checkbox.setChecked(profile.get('activo', False))
+                self.profile_checkboxes.append(checkbox)
+                self.profiles_container_layout.addWidget(checkbox)
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Error al actualizar",
+                f"Ocurrió un problema al refrescar los datos: {e}"
+            )
 
     def update_contacts_source(self):
         """Detecta y muestra el último archivo de contactos procesado."""
@@ -771,6 +782,17 @@ class CampaignsTab(QWidget):
 
         phone_list = sorted(phone_set)
 
+        total_numbers = len(phone_list)
+        if total_numbers > self.max_numbers_to_show:
+            phone_list = phone_list[:self.max_numbers_to_show]
+            self.numbers_info_label.setText(
+                f"Se encontraron {total_numbers} teléfonos. Mostrando los primeros {self.max_numbers_to_show} para evitar bloqueos."
+            )
+        else:
+            self.numbers_info_label.setText(
+                f"Se encontraron {total_numbers} teléfonos. Marcá los que quieras usar (separados por '-' ya vienen desglosados)."
+            )
+
         if not phone_list:
             self.numbers_info_label.setText(
                 "No se detectaron teléfonos en el archivo cargado."
@@ -778,10 +800,6 @@ class CampaignsTab(QWidget):
             self.select_all_numbers.setChecked(False)
             self.select_all_numbers.setEnabled(False)
             return
-
-        self.numbers_info_label.setText(
-            f"Se encontraron {len(phone_list)} teléfonos. Marcá los que quieras usar (separados por '-' ya vienen desglosados)."
-        )
 
         for phone in phone_list:
             cb = QCheckBox(phone)
