@@ -540,17 +540,33 @@ class CampaignsTab(QWidget):
         # Asegurar que todos los contactos sean diccionarios válidos
         contacts = [c for c in contacts if isinstance(c, dict)]
 
-        # Filtrar contactos por campos telefónicos elegidos
-        if selected_phone_fields:
-            contacts = [
-                c for c in contacts
-                if c.get('Telefono_origen', 'Telefono_1') in selected_phone_fields
-            ]
+        # Limitar los campos de teléfono seleccionados a los que existan en el archivo
+        available_phone_fields = self.excel_processor.get_phone_fields_from_contacts(contacts)
+        valid_phone_fields = [
+            field for field in selected_phone_fields if field in available_phone_fields
+        ]
 
-        self.load_phone_numbers(filename, contacts_override=contacts)
+        # Si no hay coincidencias, usar los campos disponibles para no perder teléfonos
+        if selected_phone_fields and not valid_phone_fields:
+            valid_phone_fields = available_phone_fields
+
+        # Filtrar contactos por campos telefónicos elegidos, pero sin perder
+        # las columnas cuando el filtro deja la lista vacía
+        filtered_contacts = [
+            c for c in contacts
+            if not valid_phone_fields
+            or c.get('Telefono_origen', 'Telefono_1') in valid_phone_fields
+        ]
+        contacts_to_use = filtered_contacts or contacts
+
+        # Sincronizar preferencias si hubo que ajustar los campos válidos
+        if valid_phone_fields != selected_phone_fields:
+            self.excel_processor.update_preferences({"selected_phone_fields": valid_phone_fields})
+
+        self.load_phone_numbers(filename, contacts_override=contacts_to_use)
 
         # Obtener columnas y respetar las variables elegidas
-        all_columns = list(contacts[0].keys()) if contacts else []
+        all_columns = list(contacts_to_use[0].keys()) if contacts_to_use else []
 
         # Cuando las preferencias no coinciden con las columnas actuales,
         # volvemos a seleccionar las columnas disponibles (excepto teléfonos
@@ -564,7 +580,7 @@ class CampaignsTab(QWidget):
             self.excel_processor.update_preferences({"selected_variables": preferred_vars})
 
         self.available_columns = preferred_vars
-        self.sample_contact = contacts[0] if contacts else None
+        self.sample_contact = contacts_to_use[0] if contacts_to_use else None
 
         if not preferred_vars:
             self.variables_hint.setText(
