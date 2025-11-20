@@ -68,7 +68,7 @@ class StatusTab(QWidget):
 
         # Tabla de campañas
         self.table = QTableWidget()
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels([
             "ID",
             "Nombre",
@@ -76,7 +76,8 @@ class StatusTab(QWidget):
             "Total",
             "Enviados",
             "Fallidos",
-            "Estado"
+            "Estado",
+            "Acciones"
         ])
         
         # Configurar columnas
@@ -88,6 +89,7 @@ class StatusTab(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
         
         self.table.setMinimumHeight(400)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -160,6 +162,27 @@ class StatusTab(QWidget):
             status_item.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row, 6, status_item)
 
+            delete_btn = QPushButton("🗑️ Eliminar")
+            delete_btn.setMinimumHeight(28)
+            delete_btn.setStyleSheet(
+                """
+                QPushButton {
+                    background-color: #e74c3c;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px 12px;
+                }
+                QPushButton:hover {
+                    background-color: #c0392b;
+                }
+                """
+            )
+            delete_btn.clicked.connect(
+                lambda checked, cid=campaign.get('id', ''): self.delete_campaign(cid)
+            )
+            self.table.setCellWidget(row, 7, delete_btn)
+
     def begin_live_campaign(self, campaign_id, campaign_name):
         """Prepara la vista de progreso para un envío en curso."""
         self.live_campaign_id = campaign_id
@@ -186,3 +209,25 @@ class StatusTab(QWidget):
         self.live_status_label.setText(
             f"Último envío finalizado ({status_text}) - ID: {self.live_campaign_id}"
         )
+
+    def delete_campaign(self, campaign_id):
+        """Elimina una campaña desde la UI y recarga la tabla."""
+        if not campaign_id:
+            QMessageBox.warning(self, "Error", "No se pudo identificar la campaña seleccionada")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Confirmar eliminación",
+            "¿Seguro que deseas eliminar este registro?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            success, message = self.sending_engine.delete_campaign(campaign_id)
+
+            if success:
+                QMessageBox.information(self, "Éxito", message)
+                self.load_campaigns()
+            else:
+                QMessageBox.warning(self, "Error", message)

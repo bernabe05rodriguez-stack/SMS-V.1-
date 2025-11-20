@@ -105,6 +105,19 @@ class SendingEngine:
 
         return campaigns
 
+    def delete_campaign(self, campaign_id):
+        """Elimina una campaña almacenada por su ID."""
+        try:
+            campaign_file = os.path.join(self.campaigns_dir, f"{campaign_id}.json")
+
+            if not os.path.exists(campaign_file):
+                return False, "Campaña no encontrada"
+
+            os.remove(campaign_file)
+            return True, "Campaña eliminada correctamente"
+        except Exception as e:
+            return False, f"Error al eliminar campaña: {str(e)}"
+
     def start_campaign(self, campaign_id, progress_callback=None, stop_event=None, pause_event=None):
         """
         Inicia el envío de una campaña.
