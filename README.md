@@ -49,7 +49,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. **Ejecutar la aplicación**
+4. **Descargar navegadores de Playwright**
+
+```bash
+playwright install chromium
+```
+
+5. **Ejecutar la aplicación**
 
 Puedes abrir la app de dos maneras:
 
