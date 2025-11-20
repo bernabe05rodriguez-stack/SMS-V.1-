@@ -7,6 +7,7 @@ import json
 import os
 import random
 import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, Optional
@@ -150,7 +151,7 @@ class SendingEngine:
 
             for profile_name in campaign['profiles']:
                 try:
-                    page = self._open_browser_for_profile(profile_name)
+                    page = self._open_browser_for_profile(profile_name, log)
                     self.sessions[profile_name] = {"page": page}
                     log(f"✅ Navegador listo para perfil: {profile_name}")
                 except Exception as e:
@@ -263,7 +264,34 @@ class SendingEngine:
                 "Playwright requiere descargar los navegadores. Ejecuta 'playwright install chromium'."
             ) from e
 
-    def _open_browser_for_profile(self, profile_name: str) -> Page:
+    def _install_browsers(self, log: Callable[[str], None]) -> None:
+        """Descarga los binarios de Playwright cuando faltan."""
+
+        log("⚠️ No se encontró el navegador de Playwright. Descargando Chromium...")
+        try:
+            result = subprocess.run(
+                ["playwright", "install", "chromium"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            if result.stdout:
+                log(result.stdout.strip())
+            log("✅ Descarga de Chromium completada")
+        except subprocess.CalledProcessError as e:
+            if e.stdout:
+                log(e.stdout.strip())
+            if e.stderr:
+                log(e.stderr.strip())
+            raise RuntimeError("No se pudo descargar Chromium con Playwright") from e
+
+        # Reiniciar Playwright con los binarios recién instalados
+        if self.playwright:
+            self.playwright.stop()
+            self.playwright = None
+        self._start_playwright(log)
+
+    def _open_browser_for_profile(self, profile_name: str, log: Callable[[str], None]) -> Page:
         """
         Abre un contexto persistente de Playwright para el perfil indicado.
 
@@ -275,11 +303,23 @@ class SendingEngine:
         profile_path.mkdir(parents=True, exist_ok=True)
 
         chromium = self.playwright.chromium
-        context: BrowserContext = chromium.launch_persistent_context(
-            user_data_dir=str(profile_path),
-            headless=False,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
+        try:
+            context: BrowserContext = chromium.launch_persistent_context(
+                user_data_dir=str(profile_path),
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+        except PlaywrightError as e:
+            error_message = str(e)
+            if "Executable doesn't exist" in error_message or "executable doesn't exist" in error_message:
+                self._install_browsers(log)
+                context = self.playwright.chromium.launch_persistent_context(
+                    user_data_dir=str(profile_path),
+                    headless=False,
+                    args=["--disable-blink-features=AutomationControlled"],
+                )
+            else:
+                raise
 
         page: Page = context.pages[0] if context.pages else context.new_page()
         page.set_default_timeout(12000)
